@@ -19,9 +19,19 @@
 ;
 ; COMPILE-TIME ONLY, like IF/ELSE/THEN/BEGIN/UNTIL (core/control.asm) —
 ; `."` is meaningless outside a colon definition (there is nowhere for
-; "compiled code" to go), and this project doesn't support typing it
-; directly at the interpreter prompt, matching the scope IF/ELSE/THEN
-; already established.
+; "compiled code" to go). A ROM that DEFINEs COMPILE_ONLY_CHECK_ENABLED
+; (rom/forth_boot.asm, the live interactive REPL — see core/interp.asm's
+; own header on that flag for why it's opt-in, not unconditional) gets
+; a real guard: typing `."` directly at the interpreter prompt now
+; refuses cleanly with the same "WORD ?" error an unrecognized word
+; gets, via core/interp.asm's COMPILE_ONLY_CHECK — this file's own
+; W_DOTQUOTE calls it first, before compiling anything. Previously this
+; was a named-but-unimplemented scope gap: typed at the prompt, `."`
+; silently compiled dead, unreachable bytes into the dictionary instead
+; of erroring. A ROM that doesn't define the flag (every existing
+; rom/forth_smoke_pNN.asm regression ROM, and rom/forth_demo_blackjack.asm)
+; is completely unaffected — none of them ever exercise this word from
+; a live, possibly-mistyped keyboard line in the first place.
 ;
 ; RUNTIME MECHANISM: the same inline-data idiom core/interp.asm's own
 ; DOLIT established for numeric literals, generalized to a
@@ -83,6 +93,11 @@ H_DOTQUOTE:
                             ; INCLUDEing this file
     DB   $82, ".", '"'       ; length 2, IMMEDIATE (bit 7 set)
 W_DOTQUOTE:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; refuse cleanly if typed at the prompt
+                                ; (STATE=0) -- see core/interp.asm's own
+                                ; header on this routine
+    ENDIF
     ld   hl, DOSTR
     call COMPILE_CALL
 

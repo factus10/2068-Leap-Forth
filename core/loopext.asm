@@ -73,6 +73,11 @@ H_EXIT:
                             ; INCLUDEing this file
     DB   $84, "E","X","I","T"   ; length 4, IMMEDIATE
 W_EXIT:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; refuse cleanly if typed at the prompt
+                                ; (STATE=0) -- see core/interp.asm's own
+                                ; header on this routine
+    ENDIF
     ld   a, (LEAVE_DEPTH)
     or   a
     jr   z, .compileret

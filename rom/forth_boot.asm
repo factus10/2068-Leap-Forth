@@ -443,6 +443,14 @@ RUNTIME_ERROR_MSG: DB "STACK?", 0
     DEFINE DECIMAL_NUMBER_ENABLED
     DEFINE RUNTIME_ERROR_CHECK_ENABLED
     DEFINE THROW_CATCH_ENABLED
+    DEFINE COMPILE_ONLY_CHECK_ENABLED   ; this is the live, interactive
+                                        ; REPL -- the one ROM where a
+                                        ; mistyped IF/DO/."/etc. at the
+                                        ; prompt is a real, reachable
+                                        ; case, not just a smoke-test
+                                        ; hypothetical (see core/
+                                        ; interp.asm's own header on
+                                        ; this flag)
     INCLUDE "core/interp.asm"
 DICT_CHAIN_POINT DEFL H_SEMICOLON
     INCLUDE "core/control.asm"

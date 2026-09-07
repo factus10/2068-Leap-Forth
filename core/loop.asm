@@ -62,6 +62,11 @@ H_WHILE:
                             ; INCLUDEing this file
     DB   $85, "W", "H", "I", "L", "E"   ; length 5, IMMEDIATE
 W_WHILE:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; refuse cleanly if typed at the prompt
+                                ; (STATE=0) -- see core/interp.asm's own
+                                ; header on this routine
+    ENDIF
     ld   hl, QBRANCH
     call COMPILE_CALL
     ld   hl, (HERE)
@@ -81,6 +86,9 @@ H_REPEAT:
     DW   H_WHILE
     DB   $86, "R", "E", "P", "E", "A", "T"   ; length 6, IMMEDIATE
 W_REPEAT:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_WHILE's own note (this file, above)
+    ENDIF
     call DPOP_HL                ; hl = WHILE's own placeholder address
     push hl                     ; stashed briefly on the Z80 hardware
                                  ; stack -- safe: symmetric push/pop

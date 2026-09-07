@@ -766,6 +766,108 @@ STACK_CHECK:
     ENDIF
 
 ; ============================================================================
+; GATED behind DEFINE COMPILE_ONLY_CHECK_ENABLED, the including ROM's
+; own opt-in (exactly like RUNTIME_ERROR_CHECK_ENABLED/
+; DECIMAL_NUMBER_ENABLED above) — every existing ROM that doesn't
+; define it gets every touched core/ file's own compiled bytes
+; byte-for-byte unchanged. This matters concretely, not just
+; stylistically: every rom/forth_smoke_pNN.asm regression ROM feeds a
+; FIXED, hand-written, already-correct Forth source string through
+; INTERPRET_RUN (or drives individual words directly from Z80 test
+; harness code) — none of them ever exercise a compile-only word
+; through a live, possibly-mistyped keyboard line the way
+; rom/forth_boot.asm's EDITOR_LOOP_LIVE does, so this guard is pure
+; dead weight in every one of them: zero behavioral benefit, nonzero
+; bytes. Several are ALREADY right at their own fixed-size ROM image's
+; edge (rom/forth_smoke_p52.asm had exactly 11 bytes of headroom before
+; this guard existed, confirmed by a real build — this file's own
+; unconditional bytes alone blew that budget by ~30, `DS $4000 - $, $FF`
+; refusing to assemble a negative pad), so this is not a hypothetical
+; concern. Only rom/forth_boot.asm (the genuine live, interactive REPL)
+; defines COMPILE_ONLY_CHECK_ENABLED; rom/forth_demo_blackjack.asm
+; doesn't need it either, for the same reason as the smoke ROMs — its
+; own header says outright it feeds a fixed game script straight to
+; INTERPRET_RUN, never through EDITOR_LOOP_LIVE.
+; ============================================================================
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+; ============================================================================
+; COMPILE_ONLY_CHECK — NOT a dictionary word. Call as the very first
+; instruction of any IMMEDIATE compile-only word (core/control.asm's
+; IF/ELSE/THEN/BEGIN/UNTIL, core/loop.asm's WHILE/REPEAT,
+; core/doloop.asm's DO/LOOP/+LOOP/LEAVE, core/loopext.asm's EXIT, and
+; core/dotquote.asm's `."`) to refuse it cleanly when typed directly at
+; the interpreter prompt instead of silently doing damage.
+;
+; THE BUG THIS CLOSES: every word in that list is IMMEDIATE, so
+; INTERPRET_RUN's own dispatch above runs its code unconditionally
+; regardless of STATE (`.execute` is reached both when interpreting AND
+; when compiling-but-immediate) -- but every one of them ALSO
+; unconditionally compiles into the dictionary at HERE (a QBRANCH/
+; BRANCH call plus a placeholder, a DO/LOOP hardware-stack frame
+; reference, or DOSTR plus raw string bytes) and several ALSO push
+; compile-time bookkeeping onto the borrowed data stack (core/
+; control.asm's own header) or into core/doloop.asm's LEAVE_HEAD_TABLE.
+; Typed at the prompt (STATE=0, no enclosing colon definition), that
+; compiled code is never reached by anything -- there is no "later,
+; when this definition runs" -- so it just sits as dead bytes,
+; permanently advancing HERE, while any placeholder address IF/BEGIN/DO
+; left on the data stack either gets silently consumed by a later word
+; that happened to be typed on the same line (if the line balances,
+; e.g. a stray `IF ... THEN` with nothing after), or leaks forever if
+; it doesn't. This is the exact failure mode core/string.asm's own
+; header documents finding and fixing in `S"` the same way (a real Fuse
+; run measuring the data stack pointer before/after proved zero effect,
+; not the expected one) -- this generalizes that fix to every other
+; compile-only word, which have no sensible interpreted meaning at all
+; (unlike `S"`, there's no live loop/branch structure at the top-level
+; interpreter for IF or DO to hook into), so the right STATE=0 behavior
+; here is to error, not to improvise an equivalent.
+;
+; CONTRACT: if STATE is nonzero (compiling), returns normally so the
+; caller falls through into its own real body, completely unaffected --
+; this is a plain `ret`, not a jump, so it costs one CALL/RET pair in
+; the working case and changes nothing else about how these words
+; behave once actually compiling. If STATE is 0 (interpreting), reports
+; the SAME "WORD ?" error INTERPRET_UNKNOWN_WORD already gives for a
+; genuinely unrecognized word (WORD_BUF still holds the just-parsed
+; token untouched, exactly as INTERPRET_UNKNOWN_WORD's own header
+; already relies on) rather than inventing a second error message and
+; a second hook contract for what is, from the typist's point of view,
+; the same kind of mistake: this word cannot be used here. Reused
+; deliberately, matching this project's own standing practice of
+; extending an established mechanism instead of adding a parallel one.
+;
+; RETURN-ADDRESS BOOKKEEPING ON THE ERROR PATH: every one of these
+; words is reached via INTERPRET_RUN's `.execute` label above (`ld de,
+; .loop / push de / jp (hl)`), so by the time this routine's own `call
+; COMPILE_ONLY_CHECK` instruction runs inside the caller's body, the
+; Z80 return-address stack holds, top to bottom: this call's own return
+; address (back into the calling word, right after the `call`), then
+; `.loop` (pushed by `.execute`, standing in for a normal call/ret so
+; the calling word's own eventual `ret` resumes the interpreter loop),
+; then whatever was on the stack before INTERPRET_RUN was entered
+; (INTERPRET_RUN's own caller). Discarding the first two restores
+; exactly the depth INTERPRET_UNKNOWN_WORD's own contract expects --
+; one entry, INTERPRET_RUN's own caller -- the identical arithmetic
+; STACK_CHECK's `.violation` path above already relies on for the same
+; reason, just one `pop` further out (STACK_CHECK is entered by a
+; direct `call` from `.loop` itself, with no intervening word to
+; discard).
+; ============================================================================
+COMPILE_ONLY_CHECK:
+    ld   a, (STATE)
+    or   a
+    ret  nz                    ; compiling: caller continues into its
+                                ; own real body, unaffected
+    pop  hl                    ; discard the return address into the
+                                ; calling word
+    pop  hl                    ; discard the calling word's own return
+                                ; address into .loop -- now exactly one
+                                ; entry left: INTERPRET_RUN's own caller
+    jp   INTERPRET_UNKNOWN_WORD
+    ENDIF
+
+; ============================================================================
 ; COMPILE_WORD ( HL = value -- )  added for Phase 4. Compiles 2 raw bytes
 ; at HERE, advancing HERE by 2 -- unlike COMPILE_LITERAL, this does NOT
 ; wrap the value in "CALL DOLIT". core/control.asm's IF/ELSE/THEN/UNTIL

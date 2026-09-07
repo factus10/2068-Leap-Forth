@@ -361,6 +361,11 @@ H_DO:
                             ; INCLUDEing this file
     DB   $82, "D", "O"        ; length 2, IMMEDIATE
 W_DO:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; refuse cleanly if typed at the prompt
+                                ; (STATE=0) -- see core/interp.asm's own
+                                ; header on this routine
+    ENDIF
     ld   hl, DO_RT
     call COMPILE_CALL
     ld   hl, (HERE)            ; remember the loop-start address (right
@@ -385,6 +390,9 @@ H_LOOP:
     DW   H_DO
     DB   $84, "L", "O", "O", "P"   ; length 4, IMMEDIATE
 W_LOOP:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_DO's own note (this file, above)
+    ENDIF
     ld   hl, LOOP_RT
     call COMPILE_CALL
     call DPOP_HL                ; hl = DO's remembered loop-start address
@@ -428,6 +436,9 @@ H_LEAVE:
     DW   H_LOOP
     DB   $85, "L", "E", "A", "V", "E"   ; length 5, IMMEDIATE
 W_LEAVE:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_DO's own note (this file, above)
+    ENDIF
     ld   hl, LEAVE_RT
     call COMPILE_CALL
     call LEAVE_SLOT_ADDR_CALC    ; hl = &LEAVE_HEAD_TABLE[LEAVE_DEPTH-1]
@@ -467,6 +478,9 @@ H_PLUSLOOP:
     DW   H_LEAVE
     DB   $85, "+", "L", "O", "O", "P"   ; length 5, IMMEDIATE
 W_PLUSLOOP:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_DO's own note (this file, above)
+    ENDIF
     ld   hl, PLUSLOOP_RT
     call COMPILE_CALL
     call DPOP_HL                ; hl = DO's remembered loop-start address

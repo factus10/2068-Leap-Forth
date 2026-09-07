@@ -140,6 +140,11 @@ H_IF:
     DW   H_ZEROEQUALS
     DB   $82, "I", "F"        ; length 2, IMMEDIATE
 W_IF:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; refuse cleanly if typed at the prompt
+                                ; (STATE=0) -- see core/interp.asm's own
+                                ; header on this routine
+    ENDIF
     ld   hl, QBRANCH
     call COMPILE_CALL
     ld   hl, (HERE)            ; address of the placeholder about to be written
@@ -159,6 +164,9 @@ H_ELSE:
     DW   H_IF
     DB   $84, "E", "L", "S", "E"   ; length 4, IMMEDIATE
 W_ELSE:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_IF's own note (this file, above)
+    ENDIF
     ld   hl, BRANCH
     call COMPILE_CALL
     ld   hl, (HERE)             ; this BRANCH's own placeholder address
@@ -188,6 +196,9 @@ H_THEN:
     DW   H_ELSE
     DB   $84, "T", "H", "E", "N"   ; length 4, IMMEDIATE
 W_THEN:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_IF's own note (this file, above)
+    ENDIF
     call DPOP_HL
     ld   de, (HERE)
     ld   a, e
@@ -206,6 +217,9 @@ H_BEGIN:
     DW   H_THEN
     DB   $85, "B", "E", "G", "I", "N"   ; length 5, IMMEDIATE
 W_BEGIN:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_IF's own note (this file, above)
+    ENDIF
     ld   hl, (HERE)
     call DPUSH_HL
     ret
@@ -220,6 +234,9 @@ H_UNTIL:
     DW   H_BEGIN
     DB   $85, "U", "N", "T", "I", "L"   ; length 5, IMMEDIATE
 W_UNTIL:
+    IFDEF COMPILE_ONLY_CHECK_ENABLED
+    call COMPILE_ONLY_CHECK    ; see W_IF's own note (this file, above)
+    ENDIF
     ld   hl, QBRANCH
     call COMPILE_CALL
     call DPOP_HL                ; hl = BEGIN's remembered loop-start address
