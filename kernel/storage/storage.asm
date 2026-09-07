@@ -41,12 +41,15 @@
 ;     failure, which is what actually matters to a caller.
 ;   - The real ROM's shared exit does `EI` unconditionally before
 ;     returning (interrupts come back on between every retry of the
-;     BASIC-level search loop); this port does not — STORAGE_LOAD/SAVE
-;     both `di` once at entry and rely on their own caller's `ei` after
-;     the whole operation completes (see BASIC_SAVE_EXROM/BASIC_LOAD_
-;     EXROM in basic.asm), so interrupts stay off for the operation's
-;     entire duration rather than toggling between individual block
-;     attempts.
+;     BASIC-level search loop); this port does not toggle between
+;     individual block attempts — STORAGE_LOAD/SAVE both `di` once at
+;     entry and `ei` once at their own exit (every return path), so
+;     interrupts stay off for the whole operation's duration rather
+;     than flickering per-block. (An earlier draft of this comment
+;     said the caller was responsible for the exit `ei`, citing a
+;     BASIC_SAVE_EXROM/BASIC_LOAD_EXROM in basic.asm — that file
+;     doesn't exist in this Forth-based project and no caller ever
+;     did it; found via audit-z80 2026-09-07 and fixed here instead.)
 ;   - The .loop's own Z-flag-dependent type-flag validation (see
 ;     .flag) needs the CALLER to leave Z clear (NZ) at the moment of
 ;     the call — neither "ld a,<type>" nor "scf" touch Z at all, so
@@ -691,6 +694,14 @@ STORAGE_SAVE:
                                          ; never actually reach the
                                          ; screen
     or   a
+    ei                                     ; re-enable interrupts before
+                                         ; returning -- STORAGE_SAVE's own
+                                         ; entry `di` above must not
+                                         ; outlive this call, or the
+                                         ; keyboard ISR (KBD_ISR_TICK)
+                                         ; never fires again and
+                                         ; IO_READ_KEY's blocking wait
+                                         ; hangs the live editor forever
     ret
 
 ; ============================================================================
@@ -880,6 +891,12 @@ STORAGE_LOAD:
                                          ; see STORAGE_SAVE's own
                                          ; matching comment for why
     xor  a
+    ei                                     ; re-enable interrupts before
+                                         ; returning -- see STORAGE_SAVE's
+                                         ; own matching comment for why;
+                                         ; `ei` touches no flags/registers,
+                                         ; so A and the carry flag set
+                                         ; just above survive intact
     ret
 
 .data_failed:
@@ -912,6 +929,15 @@ STORAGE_LOAD:
                                          ; for why
     pop  af
     scf
+    ei                                     ; re-enable interrupts on the
+                                         ; failure path too -- a failed
+                                         ; LOAD must not leave the
+                                         ; keyboard ISR permanently
+                                         ; masked any more than a
+                                         ; successful one; `ei` touches
+                                         ; no flags/registers, so A and
+                                         ; the carry flag set just above
+                                         ; survive intact
     ret
 
 ; ============================================================================
