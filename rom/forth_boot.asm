@@ -220,74 +220,59 @@ STARTUP_CHIME:
     ld   a, 165                     ; SOUND_WRITE/SOUND (see header
     out  (PORT_AY_DATA), a          ; above) -- written directly instead
 
-    ld   b, 1                       ; Channel A tone period, coarse
-    ld   c, 1                       ; -> period 421, C4 (~262 Hz)
+    ; Table-driven: every remaining event is either a SOUND_WRITE
+    ; (register, value) pair or a CHIME_DELAY (tick count), walked from
+    ; CHIME_TABLE below rather than unrolled inline -- byte-identical
+    ; event sequence, same order, same values, just data instead of 27
+    ; repeated `ld b,N:ld c,N:call SOUND_WRITE` / 11 repeated
+    ; `ld b,N:call CHIME_DELAY` blocks. $FF as the first byte of a pair
+    ; means "the second byte is a CHIME_DELAY tick count, not a
+    ; register" -- safe, since SOUND_WRITE's own real register range is
+    ; 1-16 (see its own header) and never reaches 255. $FE marks the
+    ; table's end.
+    ld   hl, CHIME_TABLE
+.loop:
+    ld   a, (hl)
+    inc  hl
+    cp   $FE
+    ret  z
+    cp   $FF
+    jr   z, .delay
+    ld   b, a
+    ld   a, (hl)
+    inc  hl
+    ld   c, a
     call SOUND_WRITE
+    jr   .loop
+.delay:
+    ld   a, (hl)
+    inc  hl
+    ld   b, a
+    push hl                         ; CHIME_DELAY destroys HL (see its
+    call CHIME_DELAY                ; own header) -- protect the table
+    pop  hl                         ; pointer across the call
+    jr   .loop
 
-    ld   b, 2                       ; Channel B tone period, fine
-    ld   c, 78
-    call SOUND_WRITE
-    ld   b, 3                       ; Channel B tone period, coarse
-    ld   c, 1                       ; -> period 334, E4 (~330 Hz)
-    call SOUND_WRITE
-
-    ld   b, 4                       ; Channel C tone period, fine
-    ld   c, 25
-    call SOUND_WRITE
-    ld   b, 5                       ; Channel C tone period, coarse
-    ld   c, 1                       ; -> period 281, G4 (~392 Hz)
-    call SOUND_WRITE
-
-    ld   b, 7                       ; mixer: all three tones enabled,
-    ld   c, 248                     ; all three noise generators off
-    call SOUND_WRITE                ; ($FF with bits 0-2 cleared)
-
-    ld   b, 8                       ; all three silent until each
-    ld   c, 0                       ; channel's own staggered attack
-    call SOUND_WRITE                ; below brings it in
-    ld   b, 9
-    call SOUND_WRITE
-    ld   b, 10
-    call SOUND_WRITE
-
+CHIME_TABLE:
+    ; Channel A tone period coarse (period 421, C4 ~262 Hz); Channel B
+    ; tone period fine/coarse (period 334, E4 ~330 Hz); Channel C tone
+    ; period fine/coarse (period 281, G4 ~392 Hz); mixer (all three
+    ; tones on, all noise off); all three channels silent until their
+    ; own staggered attack below.
+    DB   1,1,  2,78,  3,1,  4,25,  5,1,  7,248,  8,0,  9,0,  10,0
     ; ---- staggered, ramped attack: A rolls in first, then B, then C,
-    ; each fading up over 3 steps instead of snapping to full volume ----
-    ld   b, 8  : ld c, 4  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 8  : ld c, 8  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 8  : ld c, 12 : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY             ; gap before B enters
-
-    ld   b, 9  : ld c, 4  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 9  : ld c, 8  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 9  : ld c, 12 : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY             ; gap before C enters
-
-    ld   b, 10 : ld c, 4  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 10 : ld c, 8  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 10 : ld c, 12 : call SOUND_WRITE  ; full chord now sounding
-
-    ld   b, 22                      ; hold the full chord ~440ms
-    call CHIME_DELAY
-
+    ; each fading up over 3 steps instead of snapping to full volume --
+    ; a $FF,3 pair is CHIME_DELAY 3 ticks, same gap used throughout ----
+    DB   8,4,  $FF,3,  8,8,  $FF,3,  8,12, $FF,3   ; gap before B enters
+    DB   9,4,  $FF,3,  9,8,  $FF,3,  9,12, $FF,3   ; gap before C enters
+    DB   10,4, $FF,3,  10,8, $FF,3,  10,12         ; full chord now sounding
+    DB   $FF,22                      ; hold the full chord ~440ms
     ; ---- release: all three fade down together ----
-    ld   b, 8  : ld c, 8  : call SOUND_WRITE
-    ld   b, 9  : ld c, 8  : call SOUND_WRITE
-    ld   b, 10 : ld c, 8  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 8  : ld c, 4  : call SOUND_WRITE
-    ld   b, 9  : ld c, 4  : call SOUND_WRITE
-    ld   b, 10 : ld c, 4  : call SOUND_WRITE
-    ld   b, 3  : call CHIME_DELAY
-    ld   b, 8  : ld c, 0  : call SOUND_WRITE  ; the AY holds its last
-    ld   b, 9  : ld c, 0  : call SOUND_WRITE  ; register state
-    ld   b, 10 : ld c, 0  : call SOUND_WRITE  ; indefinitely otherwise
-    ret
+    DB   8,8,  9,8,  10,8,  $FF,3
+    DB   8,4,  9,4,  10,4,  $FF,3
+    DB   8,0,  9,0,  10,0            ; the AY holds its last register
+                                     ; state indefinitely otherwise
+    DB   $FE,0                       ; end of table
 
 ; ============================================================================
 ; CHIME_DELAY — busy-waits until FRAMES (kernel/interrupt.asm) has
@@ -381,6 +366,9 @@ INTERPRET_UNKNOWN_WORD:
     ld   hl, 13
     call DPUSH_HL
     call W_EMIT
+REPORT_INTERP_ERROR:              ; shared tail with RUNTIME_ERROR_HOOK's
+                                   ; own .msgdone below -- byte-identical,
+                                   ; merged rather than duplicated
     xor  a
     ld   (STATE), a
     ld   a, 1
@@ -419,14 +407,11 @@ RUNTIME_ERROR_HOOK:
     ld   hl, 13
     call DPUSH_HL
     call W_EMIT
-    xor  a
-    ld   (STATE), a          ; same fix as INTERPRET_UNKNOWN_WORD's own
-                              ; STATE reset above -- an IMMEDIATE word's
-                              ; runtime error while compiling could
-                              ; otherwise leave STATE stuck too
-    ld   a, 1
-    ld   (INTERP_ERROR_FLAG), a   ; same as INTERPRET_UNKNOWN_WORD's own
-    ret
+    ; same fix as INTERPRET_UNKNOWN_WORD's own STATE reset -- an
+    ; IMMEDIATE word's runtime error while compiling could otherwise
+    ; leave STATE stuck too. Byte-identical to that routine's own tail,
+    ; so shared via REPORT_INTERP_ERROR instead of duplicated here.
+    jp   REPORT_INTERP_ERROR
 
 RUNTIME_ERROR_MSG: DB "STACK?", 0
 
