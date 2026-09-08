@@ -2769,6 +2769,22 @@ That's what makes this the standard idiom for "read a key only if
 one's waiting" — `KEY?` genuinely just peeks, so a key you check for
 is still there for `KEY` to read afterward.
 
+`BREAK? ( -- flag )` checks for one specific combination instead of
+any key: the real Sinclair CAPS SHIFT+SPACE BREAK keys. It's completely
+independent of `KEY`/`KEY?` — checking it never consumes or disturbs
+whatever those are tracking — so it's meant for a different job:
+making your own long-running loop abortable, the same way pressing
+BREAK stops a running BASIC program.
+
+```forth
+: COUNT-FOREVER  0 BEGIN 1+ DUP . BREAK? UNTIL ;
+```
+
+Without the `BREAK?` in its `UNTIL` test, that loop would never stop
+on its own. With it, holding CAPS SHIFT+SPACE ends it on the next
+pass — the loop keeps counting exactly as before, and now has a way
+out.
+
 Combine plain `KEY` with [section 7](#7-repeating-yourself)'s
 `BEGIN`/`UNTIL` and you get the standard "wait for a specific key"
 idiom — the keyboard equivalent of `COUNTDOWN`'s loop-until-zero:
@@ -2861,7 +2877,8 @@ time, without waiting, or a whole line at a time.
 
 Forth words `PLOT`, `LINE`, `CIRCLE`, `FILL`, `CLS`, `BORDER`, `INK`,
 `PAPER`, `BRIGHT`, `FLASH`, `AT-XY`, `HIRES`, `NORMAL`, `BEEP`,
-`SOUND`, `IN`, `OUT`, `UDG`, `KEY`, `KEY?`, `STICK`, `ACCEPT`, `INPUT`.
+`SOUND`, `IN`, `OUT`, `UDG`, `KEY`, `KEY?`, `BREAK?`, `STICK`,
+`ACCEPT`, `INPUT`.
 
 ### Exercises
 

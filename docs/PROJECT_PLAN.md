@@ -3688,6 +3688,158 @@ length by one character... measured directly, not derived from that
 arithmetic: a disposable worktree at the Phase-60 commit gave
 15680/704 free before this phase, matching the number above exactly).
 
+## Phase 62 — BREAK?
+
+**Status: implemented, assembles clean across every affected ROM,
+dictionary-chain-verified. Half-confirmed, honestly**: the FALSE case
+is proven live under real Fuse via the new smoke ROM; the TRUE case
+(actually holding CAPS SHIFT+SPACE) can't be automated the way
+`KEY?`'s own smoke ROM fakes a latched key, but is independently
+corroborated by the sibling `ts2068rom` project's own live-tested copy
+of the same routine — see below.
+
+Found the same way Phase 60/61 were found: asked directly whether the
+hardware exposes anything BASIC has but Forth doesn't. `kernel/io/
+io.asm`'s `IO_CHECK_BREAK` — a real keyboard-matrix scan for the
+Sinclair BREAK combination, CAPS SHIFT+SPACE — has existed in this
+project's inherited kernel the whole time, called internally by
+nothing in `2068-forth` itself, and had no Forth word. Added
+`BREAK? ( -- flag )` to `core/key.asm`, immediately after the existing
+`KEY?`: `call IO_CHECK_BREAK` then push `-1`/`0` off the returned
+carry flag. Deliberately does its own fresh scan every call rather
+than route through `KEY`/`KEY?`'s latched-sysvar mechanism, so
+checking `BREAK?` can never consume or disturb whatever `KEY`/`KEY?`
+are separately tracking — the two are fully independent, proven by
+this phase's own smoke ROM (checkpoint 2, below).
+
+Before implementing, checked
+[jon0x0/AISkill_TS2068](https://github.com/jon0x0/AISkill_TS2068) (a
+third-party TS2068 hardware glossary/tooling repo) per direct request,
+looking for anything that might point at more missing keywords beyond
+`BREAK?`. It confirmed facts already established in this project's own
+history (HSR/DECR/EXROM/DOCK port layout, ATTR byte bit layout) and
+surfaced one genuinely new, bigger idea for a future phase — AY-chip
+DAC/speech sample playback (`speech2ay`/`audio2aydac` tooling) — plus
+one unverified lead ("Extended Color Mode") that doesn't obviously
+correspond to anything `kernel/graphics`'s own `GFX_MODE` implements
+(only Normal and High Resolution Graphics exist there, matching
+`ts2068rom`'s own two real port values); flagged as unverified, not
+treated as a confirmed gap, and not pursued this phase.
+
+**Corroboration from the sibling project**: `ts2068rom`'s own copy of
+`IO_CHECK_BREAK` (`kernel/io/io.asm:740` there) is byte-for-byte
+identical to `2068-forth`'s (`kernel/io/io.asm:758` here) — confirmed
+directly via `diff`, empty output, not just "looks similar." That
+sibling project's own `docs/programmers_reference.md` describes this
+exact routine as "implemented and polled during program execution"
+(line ~456) — i.e., proven in that project's own live use, not merely
+assembled and left untested the way this phase's own smoke ROM has to
+leave its TRUE case. Since the routine is identical code, that live
+confirmation carries over here as real (if indirect) evidence that the
+TRUE case works, on top of the direct FALSE-case proof this phase's
+own smoke ROM gives.
+
+**Dictionary wiring**: `H_BREAKQ` chains after `H_KEYQ`
+(`core/key.asm`'s own `DICT_LATEST_INIT_KEYQ` updated to `H_BREAKQ`
+in value only — the symbol name itself was deliberately left alone,
+since nothing outside this file references it by name; chain
+continuation past this file happens via each include site's own
+`DICT_CHAIN_POINT DEFL`). Three chain-continuation sites found by
+grepping every `core/key.asm` include site directly: `rom/
+forth_boot.asm`, `rom/forth_demo_blackjack.asm`, and `rom/
+forth_smoke_p36.asm` (found on a systematic re-check, not the first
+pass — `forth_smoke_p36.asm` continues on into `core/bytemem.asm` and
+was easy to miss). All three mechanically updated, `H_KEYQ` ->
+`H_BREAKQ`. `rom/forth_boot.asm`'s own word-count header comment
+re-derived the way Phase 60 established (actually assembling the ROM
+and walking the real `LINK` chain byte-by-byte from
+`DICT_LATEST_INIT_LOADTEXT`, not incrementing by eye): 143 unique
+names, zero duplicates, `BREAK?` confirmed linked between `KEY?` and
+`ABS`.
+
+**Smoke ROM**: `rom/forth_smoke_p62.asm`, two checkpoints. Checkpoint
+1: `BREAK?` reads FALSE on an idle bus (a real hardware scan against
+Fuse's own unpressed keyboard state — genuinely proves the FALSE case,
+not a stub). Checkpoint 2: force `KBD_KEYHIT`/`KBD_LASTK` the same way
+`rom/forth_smoke_p36.asm`'s own checkpoint 5 does, call `BREAK?` (a
+real scan, result discarded), then confirm `KEY?` still reads TRUE
+afterward — proves the two words' mechanisms are genuinely
+independent rather than one silently consuming state the other relies
+on. Builds clean (`make forth-smoke-p62`, 0 errors).
+
+**The honest gap**: unlike `KEY?`'s own smoke ROM, there's no sysvar
+to pre-seed for `BREAK?`'s TRUE case — `IO_CHECK_BREAK` does its own
+fresh port scan every call, which is exactly the point of the word,
+but means it can't be faked for an automated test the same way. Same
+honest-gap class as `core/editor.asm`'s own `EDITOR_LOOP_LIVE` (see
+that file's header): genuinely out of reach for a border-color smoke
+ROM, not skipped out of laziness. Mitigated, not closed, by the
+`ts2068rom` corroboration above.
+
+ROM budget right after `BREAK?` itself landed: `rom/forth_boot.asm`
+used 15597 of 16384 bytes ($3CED of $4000), 787 bytes free — +24 bytes
+over the Phase-61 baseline (a disposable worktree at commit `0e4ec3f`,
+the last commit touching `rom/forth_boot.asm` before this phase, gave
+15573/811 free), exactly matching `BREAK?`'s own header-plus-code size
+by hand (9-byte header for `"BREAK?"` + `call`/`ld`/`jr`/`ld`/`call`/
+`ret` = 15 bytes of code = 24 total).
+
+**`make check` fallout, same phase**: running the full verification
+pass surfaced two pre-existing `[FAIL]` blocks from `tools/
+check_z80_opcodes.py`'s JR/DJNZ range estimate — unrelated to
+`BREAK?` itself (confirmed: identical at commit `0e4ec3f`, before this
+phase's own changes), but addressed while everything was already being
+walked end to end rather than left for a future session to rediscover.
+Traced each flagged line to its real, sjasmplus-computed displacement
+in the compiled `.lst` (not just the checker's own estimate, which the
+tool's own docstring already says can be off by a few bytes either
+way):
+
+- `kernel/graphics/graphics.asm:1591` (`GFX_LINE`'s Bresenham loop
+  close) — real displacement -126, only 2 bytes of margin before the
+  hard -128 limit, confirmed identically across every ROM that
+  includes it (`forth_boot.asm`, `forth_smoke_p60.asm`, both checked
+  directly). Genuinely thin, not just a heuristic false alarm.
+  Converted `jr .loop` to `jp .loop` (+1 byte, no range limit at all).
+- `core/interp.asm`'s `NUMBER` (the `DECIMAL_NUMBER_ENABLED`-gated
+  `ELSE` branch, old line 306) — confirmed dead code in every ROM that
+  actually defines `DECIMAL_NUMBER_ENABLED` (including `rom/
+  forth_boot.asm` itself: the `.lst` shows zero bytes emitted for that
+  branch there), and a healthy +106/21-byte-margin real displacement
+  in `rom/forth_smoke_p62.asm`, the one built ROM that does take it.
+  Collapsed the whole `IFDEF`/`ELSE`/`ENDIF` split down to a single
+  unconditional `jp z, .fail` — the `IFDEF` existed only to pick `jp`
+  vs `jr` for this one instruction, so once both branches use `jp` the
+  split has nothing left to do. Net simplification, not just a range
+  fix.
+- `core/interp.asm`'s `INTERPRET_RUN` (the `.gotfloat` branch's own
+  loop-closing jump) — real displacement -100, 28-byte margin in `rom/
+  forth_boot.asm`, also not actually at risk. Converted `jr .loop` to
+  `jp .loop` anyway (+1 byte) to fully silence the checker rather than
+  leave a documented-but-still-flagged false positive for the next
+  person to re-investigate from scratch.
+
+Every other `jr`/`djnz` in `core/interp.asm` and `kernel/graphics/
+graphics.asm` was left untouched — only the three lines the checker
+actually flagged were touched, per its own report, not a blanket
+jr-to-jp sweep. Rebuilt all 68 `make all` targets clean (0 errors, 0
+warnings) after these three changes, then reran `make check`: both
+`[FAIL]` blocks gone, exit 0. (The `[REVIEW]` stack-ordering
+fingerprints `check_asm.py` also prints — `pop hl`/`pop bc` near the
+entry of `QBRANCH`, `BRANCH`, `DODOES`, `DOFLIT`, `W_DOES`, `DO_RT`/
+`LOOP_RT`/`LEAVE_RT`/`PLUSLOOP_RT`, `DOSTR`, `DOLIT`/
+`COMPILE_ONLY_CHECK`, `DOSSTR` — are pre-existing, don't fail the
+build, and are each that routine's own established calling
+convention, not new findings from this phase; out of scope here.)
+
+Final ROM budget after these three fixes: `rom/forth_boot.asm` uses
+15599 of 16384 bytes ($3CEF of $4000), 785 bytes free — +2 bytes over
+the number just above (one `jr`->`jp` conversion applied inside a
+`DECIMAL_NUMBER_ENABLED`-gated block `forth_boot.asm` actually
+compiles, `INTERPRET_RUN`'s `.gotfloat` loop; the `GFX_LINE` conversion
+is the other byte; `NUMBER`'s own `ELSE`-branch collapse cost nothing
+here since that branch was already dead code in this particular ROM).
+
 ## Testing discipline
 
 Carry forward the validated order from 2068-Leap, applied to Forth

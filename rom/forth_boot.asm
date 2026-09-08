@@ -24,12 +24,12 @@
 ; S>F/F>S/FROUND, PI/SIN/COS/RAD/DEG, BEEP, SOUND, ULAPLUS/PALETTE,
 ; =/</>, VARIABLE/CONSTANT, INK/PAPER/BRIGHT/FLASH, HIRES/NORMAL,
 ; 64COL/32COL/PALETTE64/PLOT64, DO/LOOP/LEAVE/+LOOP/I/J, FILL/AT-XY,
-; KEY/KEY?, ABS/SGN/MOD/SQRT/RND/RANDOMIZE, 1+/1-/NEGATE/MAX/MIN,
+; KEY/KEY?/BREAK?, ABS/SGN/MOD/SQRT/RND/RANDOMIZE, 1+/1-/NEGATE/MAX/MIN,
 ; ARRAY/CELLS, S"/TYPE/STRING/PLACE/COUNT/LEN/VAL, C@/C!, STICK,
 ; ACCEPT/INPUT, CHR/STR/UPPER/LOWER/LEFT/RIGHT/SEARCH/CODE, EXECUTE,
 ; HERE/,/C,/ALLOT/CREATE/DOES>/IMMEDIATE, FREE, THROW/CATCH,
 ; ROT/2DUP/2DROP/?DUP/PICK, AND/OR/XOR/INVERT, ' (TICK), LPRINT/LLIST,
-; VLIST, ABORT/QUIT, IN/OUT, FORGET, UDG, EXIT — 142 words total.
+; VLIST, ABORT/QUIT, IN/OUT, FORGET, UDG, EXIT — 143 words total.
 ; RE-DERIVED, NOT HAND-COUNTED: this comment's own earlier draft
 ; (claiming 93) had already gone stale twice over — once discovered
 ; during a Phase-24-era consolidation pass (missing the original Phase
@@ -37,20 +37,20 @@
 ; Phase 49/50 with nobody re-deriving it (the comment said so itself,
 ; rather than guess). Both times the number was hand-counted or hand-
 ; incremented from prose. This time (and again for Phase 60/61's
-; BRIGHT/FLASH) it's the result of actually assembling this file and
-; walking the real dictionary's own LINK chain in the compiled binary,
-; byte for byte, from LATEST's own seed (DICT_LATEST_INIT_LOADTEXT)
-; down to the LINK=0 sentinel — the same class of check that caught
-; two real dictionary-orphaning bugs earlier in this project's history
-; (a chain-point set to the wrong tail marker silently drops every
-; word after it, which eyeballing headers can miss but walking the
-; real chain cannot). 142 unique names, zero duplicates, zero
-; shadowing, chained into one LATEST list via the same
-; DICT_CHAIN_POINT splices rom/forth_smoke_p9.asm introduced and
-; proved. Whoever next adds a phase: re-run this same walk (build this
-; ROM, then follow DICT_LATEST_INIT_LOADTEXT's own LINK chain through
-; the assembled .bin) rather than incrementing this number by eye —
-; that's exactly the habit that let it drift twice.
+; BRIGHT/FLASH, and Phase 62's BREAK?) it's the result of actually
+; assembling this file and walking the real dictionary's own LINK
+; chain in the compiled binary, byte for byte, from LATEST's own seed
+; (DICT_LATEST_INIT_LOADTEXT) down to the LINK=0 sentinel — the same
+; class of check that caught two real dictionary-orphaning bugs
+; earlier in this project's history (a chain-point set to the wrong
+; tail marker silently drops every word after it, which eyeballing
+; headers can miss but walking the real chain cannot). 143 unique
+; names, zero duplicates, zero shadowing, chained into one LATEST list
+; via the same DICT_CHAIN_POINT splices rom/forth_smoke_p9.asm
+; introduced and proved. Whoever next adds a phase: re-run this same
+; walk (build this ROM, then follow DICT_LATEST_INIT_LOADTEXT's own
+; LINK chain through the assembled .bin) rather than incrementing this
+; number by eye — that's exactly the habit that let it drift twice.
 ; DECIMAL_NUMBER_ENABLED is also DEFINEd here (core/decimal.asm,
 ; Phase 23) — not a dictionary word, a NUMBER/INTERPRET_RUN parsing
 ; capability: typing a literal like `3.5` now pushes a real float
@@ -485,7 +485,7 @@ DICT_CHAIN_POINT DEFL H_ATXY
     INCLUDE "core/hires.asm"
 DICT_CHAIN_POINT DEFL H_NORMAL
     INCLUDE "core/key.asm"
-DICT_CHAIN_POINT DEFL H_KEYQ
+DICT_CHAIN_POINT DEFL H_BREAKQ
     INCLUDE "core/mathfn.asm"
 DICT_CHAIN_POINT DEFL H_SLASH
     INCLUDE "core/arith.asm"

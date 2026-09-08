@@ -1,5 +1,5 @@
 ; ============================================================================
-; core/key.asm — Phase 20: KEY
+; core/key.asm — Phase 20: KEY; Phase 62: BREAK?
 ;
 ; Builds on core/dict.asm and core/interp.asm (both must be INCLUDEd
 ; first — this file's own first header chains through DICT_CHAIN_POINT)
@@ -20,6 +20,16 @@
 ; own header for the complete list). No case-folding here — that's
 ; core/interp.asm's own W_WORD job for a parsed word, not this word's;
 ; KEY hands back exactly what IO_READ_KEY decoded.
+;
+; BREAK? ( -- flag ), added Phase 62: real Sinclair CAPS SHIFT+SPACE
+; abort-combo detection, backed by kernel/io's own IO_CHECK_BREAK — a
+; real keyboard-matrix scan (not a buffered read; does its own scan
+; each call, no interaction with KEY/KEY?'s own latched-key state).
+; Lets a user's own loop become abortable: `BEGIN ... BREAK? UNTIL`.
+; Found idle in the inherited kernel (used internally by the sibling
+; BASIC project's own program-run loop) with no Forth word exposing it
+; — same shape of gap BRIGHT/FLASH closed for CURRENT_ATTR's own
+; unclaimed bits.
 ; ============================================================================
 
     IFNDEF CORE_KEY_ASM
@@ -73,8 +83,27 @@ W_KEYQ:
     call DPUSH_HL
     ret
 
-DICT_LATEST_INIT_KEYQ EQU H_KEYQ   ; head of the dictionary once this
-                                    ; file's own words (KEY and KEY?)
-                                    ; are both included
+; ============================================================================
+; BREAK? ( -- flag )  Phase 62. TRUE (-1) if CAPS SHIFT+SPACE is
+; currently held, FALSE (0) otherwise. Does its own keyboard scan each
+; call (kernel/io's own IO_CHECK_BREAK) -- independent of KEY/KEY?'s
+; latched-key state, so checking it never consumes or disturbs a
+; pending KEY.
+; ============================================================================
+H_BREAKQ:
+    DW   H_KEYQ
+    DB   6, "B", "R", "E", "A", "K", "?"
+W_BREAKQ:
+    call IO_CHECK_BREAK
+    ld   hl, 0
+    jr   nc, .push
+    ld   hl, -1
+.push:
+    call DPUSH_HL
+    ret
+
+DICT_LATEST_INIT_KEYQ EQU H_BREAKQ   ; head of the dictionary once this
+                                    ; file's own words (KEY, KEY?, and
+                                    ; BREAK?) are all included
 
     ENDIF

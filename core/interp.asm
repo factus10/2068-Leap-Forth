@@ -290,21 +290,14 @@ NUMBER:
     call DPOP_HL
     ld   a, (hl)
     or   a
-    IFDEF DECIMAL_NUMBER_ENABLED
-    jp   z, .fail                 ; JP, not JR -- gated the same as the
-                                   ; rest of Phase 23's own hook below:
-                                   ; that IFDEF block pushed this
-                                   ; displacement within 10 bytes of
-                                   ; JR's +-127 limit (flagged by
-                                   ; tools/check_z80_opcodes.py) only
-                                   ; when it's actually compiled in; a
-                                   ; ROM that doesn't opt in never grew
-                                   ; NUMBER, so its own JR was never at
-                                   ; risk and stays byte-for-byte
-                                   ; unchanged
-    ELSE
-    jr   z, .fail
-    ENDIF
+    jp   z, .fail                 ; JP, not JR -- unconditionally, in
+                                   ; both the DECIMAL_NUMBER_ENABLED and
+                                   ; plain builds: tools/
+                                   ; check_z80_opcodes.py flagged both
+                                   ; forms as within 10 bytes of JR's
+                                   ; +-127 limit at one point or another,
+                                   ; so JP (no range limit at all) beats
+                                   ; carrying two branches to track
     ld   (NUM_COUNT), a
     inc  hl
     ld   (NUM_PTR), hl
@@ -659,7 +652,10 @@ INTERPRET_RUN:
                                     ; float stack, nothing more to do
     call FPOP                      ; compiling: take the float back off
     call COMPILE_FLOAT_LITERAL     ; the float stack and compile it as
-    jr   .loop                     ; a literal instead
+    jp   .loop                     ; a literal instead -- JP, not JR:
+                                    ; tools/check_z80_opcodes.py flagged
+                                    ; this displacement within 10 bytes
+                                    ; of JR's +-127 limit
     ENDIF
 
 .badword:

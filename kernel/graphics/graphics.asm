@@ -1588,7 +1588,13 @@ GFX_LINE:
     ld   (GFX_LINE_Y0), a
 .skip_y_step:
 
-    jr   .loop
+    jp   .loop                     ; JP, not JR: tools/
+                                    ; check_z80_opcodes.py flagged this
+                                    ; displacement at -126, only 2 bytes
+                                    ; of real margin before JR's -128
+                                    ; hard limit -- confirmed directly
+                                    ; from the assembled .lst, not just
+                                    ; the tool's own estimate
 
 ; ============================================================================
 ; GFX_PLOT_CLIPPED (internal — not in kernel_api.inc)
