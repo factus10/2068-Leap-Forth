@@ -3840,6 +3840,124 @@ compiles, `INTERPRET_RUN`'s `.gotfloat` loop; the `GFX_LINE` conversion
 is the other byte; `NUMBER`'s own `ELSE`-branch collapse cost nothing
 here since that branch was already dead code in this particular ROM).
 
+## Phase 63 — TONE, VOLUME, MIXER, NOISE, ENVELOPE
+
+**Status: done, confirmed under real Fuse.** Direct follow-on to the
+question "does the ts2068ROM's own AY code match what you have in
+mind... could this be expanded to take better advantage of the
+hardware?" — asked right after Phase 62. Answering it required a real
+correction first: initial research claimed the AY-3-8912 was
+completely unexposed in this project; re-checking found `SOUND
+( register data -- )` already existed (Phase 32) as exactly that raw
+register-poke primitive, already live-audio-confirmed by the user.
+What was actually missing was a convenience layer on top of it.
+
+`core/soundext.asm` (new file — see below for why it's not folded
+into `core/sound.asm`) adds five words, each a mechanical wrapper
+around the AY-3-8912's own well-documented register map, no new
+design and no note/frequency tables: `TONE ( channel period -- )`
+(registers 0-5, fine/coarse tone-period pairs per channel — and the
+ONLY way to reach chip register 0, Channel A's own tone-period fine
+byte, which `SOUND` itself can never select, per Phase 32's own
+header); `VOLUME ( channel level -- )` (registers 8-10, always fixed
+volume — bit 4, the "use the envelope generator instead" bit, is
+unconditionally cleared); `MIXER ( mask -- )` (register 7, a direct
+unmodified write — deliberately NOT bit-inverted to a friendlier
+"1=on" convention, matching `SOUND`'s own established preference for
+staying faithful to real hardware semantics over friendliness);
+`NOISE ( period -- )` (register 6, masked to 5 bits); `ENVELOPE
+( period shape -- )` (registers 11-13 — the shared envelope generator's
+period and shape; does NOT route any channel through it, since that
+needs bit 4 of that channel's own amplitude register, which `VOLUME`
+above always clears — a raw `SOUND` write is still needed for that one
+bit, same "several coordinated writes, by hand" reality `SOUND`'s own
+header already documents for a clean tone).
+
+Internally, none of the five share `SOUND`'s own `SOUND_WRITE` routine
+— that routine's 1-16 BASIC-compatible numbering can never reach chip
+register 0 (confirmed in Phase 32's own header), so a wrapper that
+needs genuine full-register reach needed its own native 0-15
+`AY_WRITE` instead. This exactly matches the sibling `~/ts2068rom`
+project's own precedent: it keeps an identical two-layer split, its
+BASIC-compatible `SOUND_EXROM` (1-16, `rom/exrom_sound.asm`) alongside
+a separate native-numbered `AYREG` extension (0-15, `rom/extensions/
+ayreg.asm`) — checked directly this session before writing any code,
+not assumed.
+
+**A real bug in this phase's own first draft, caught by hand-checking
+the register math before building anything**: `ENVELOPE`'s own header
+comment first read `16 8 SOUND` as the example for routing a channel
+through the envelope generator — backwards on both counts (`SOUND`'s
+own stack order is `register data --`, and register 8, not 16, is
+Channel A's amplitude register; `SOUND`'s own 1-16 range has no
+offset, per Phase 32). Fixed to `8 16 SOUND` before the smoke ROM was
+ever built. The actual register arithmetic in `W_TONE`/`W_VOLUME`/
+`W_ENVELOPE` was hand-verified separately (channel*2/channel*2+1 for
+tone, channel+8 for volume, 11/12/13 for envelope) and found correct.
+
+**A real, second ROM-budget casualty, this time requiring a
+structural fix, not a byte hunt**: adding all five words plus
+`AY_WRITE` directly into `core/sound.asm` (153 bytes) pushed `rom/
+forth_smoke_p52.asm` — the SAVE-TEXT/LOAD-TEXT Blackjack round-trip
+test, already down to exactly ONE byte of headroom after Phase 60/61's
+own rebalance — 152 bytes over the 16K ceiling. Checked first, rather
+than immediately byte-hunting again: does that ROM's own embedded
+Blackjack test payload (`rom/forth_smoke_p52_blackjack_test.fs`) call
+any of the five new words at all? It doesn't — it calls `SOUND`
+directly (several times) but never `TONE`/`VOLUME`/`MIXER`/`NOISE`/
+`ENVELOPE`. So the 153 bytes were pure dead weight in that one ROM's
+own compiled dictionary, not a real capability loss waiting to be
+recovered by trimming something else. Fixed by splitting the five
+words out into their own file, `core/soundext.asm`, INCLUDEd only by
+ROMs that actually want the convenience layer (`rom/forth_boot.asm`,
+`rom/forth_demo_blackjack.asm`, `rom/forth_smoke_p53_realtape.asm`,
+`rom/forth_smoke_p57.asm`, and this phase's own `rom/
+forth_smoke_p63.asm`) — `rom/forth_smoke_p52.asm` now INCLUDEs only
+`core/sound.asm`, exactly as it did before this phase, restored to its
+original one-byte margin. Precedent for the split: `core/floatmul.asm`
+and `core/floatdiv.asm` already stay separate from `core/float.asm`
+for the identical reason — a ROM that needs the base capability
+shouldn't be forced to pay for a layer on top of it it never calls.
+
+**Dictionary wiring**: `core/sound.asm` itself is unchanged from
+Phase 32 (`DICT_LATEST_INIT_SOUND` still `H_SOUND`); `core/
+soundext.asm` chains `H_TONE` after whatever `DICT_CHAIN_POINT` is set
+to `H_SOUND` at its own INCLUDE site, then `H_VOLUME` -> `H_MIXER` ->
+`H_NOISE` -> `H_ENVELOPE` internally, exposing its own
+`DICT_LATEST_INIT_SOUNDEXT`. `rom/forth_boot.asm`'s own word-count
+header comment re-derived the established way (assembling the ROM,
+walking the real `LINK` chain byte-by-byte, not incrementing by eye):
+148 unique names, zero duplicates, the five new words confirmed linked
+`SOUND <- TONE <- VOLUME <- MIXER <- NOISE <- ENVELOPE <- =`
+(`core/compare.asm`'s own head).
+
+**Smoke ROM**: `rom/forth_smoke_p63.asm`, seven checkpoints — a valid
+call and (for `TONE`/`VOLUME`, the two words with an actual rejection
+path) an out-of-range-channel call for each word, proving exactly its
+own stated stack arguments are consumed and nothing else. Same honest
+limit as `SOUND`'s own Phase 32 smoke ROM: this project keeps no
+software shadow of the AY-3-8912's ports, so there is no way for a
+border-color check to confirm the right bytes reached the right
+registers — that was hand-verified against the real register map
+instead (above), not machine-checked. **Confirmed under real Fuse**,
+not just assembled: `fuse --debugger-command` with breakpoints on the
+smoke ROM's own `PASS_TEST`/`FAIL_TEST` loop-back jumps (the same
+technique `tools/run_realtape_test.sh` already established for
+headless, scriptable Fuse verification — `print ula:last` after the
+break), run headless via `script` for a real pseudo-terminal: border
+reads `0x4` (green, all seven passed) and `CHECKPOINT_NUM` reads `0x7`
+(the last checkpoint set was the seventh, `ENVELOPE`), confirming
+every checkpoint actually ran, not just that the ROM didn't crash.
+
+ROM budget: `rom/forth_boot.asm` (now INCLUDEing both `core/sound.asm`
+and `core/soundext.asm`) uses 15752 of 16384 bytes ($3D88 of $4000),
+632 bytes free — +153 bytes over Phase 62's own closing number, all of
+it this phase's own five words plus `AY_WRITE` (unaffected by the
+`core/sound.asm`/`core/soundext.asm` split itself, which only moves
+code between files, not in or out of any given ROM's own build).
+`rom/forth_smoke_p52.asm` uses 16383 of 16384 bytes ($3FFF of $4000),
+1 byte free — confirmed identical to its own pre-Phase-63 baseline.
+
 ## Testing discipline
 
 Carry forward the validated order from 2068-Leap, applied to Forth

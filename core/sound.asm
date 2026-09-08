@@ -1,5 +1,15 @@
 ; ============================================================================
-; core/sound.asm — Phase 32: SOUND (real AY-3-8912 register access)
+; core/sound.asm — Phase 32: SOUND (real AY-3-8912 register access).
+; See core/soundext.asm (Phase 63) for a channel-aware convenience
+; layer on top of it (TONE, VOLUME, MIXER, NOISE, ENVELOPE) — kept in
+; a SEPARATE file deliberately, not appended here: rom/
+; forth_smoke_p52.asm's own embedded Blackjack test payload calls
+; `SOUND` but none of those five, and that one ROM was already down to
+; a single byte of headroom (see its own header) before Phase 63
+; existed — same reasoning core/floatmul.asm/core/floatdiv.asm are
+; already split from core/float.asm rather than folded in, so a ROM
+; that needs the base capability isn't forced to pay for a layer on
+; top of it it never calls.
 ;
 ; Builds on core/dict.asm and core/interp.asm (both must be INCLUDEd
 ; first — chains its own dictionary entry onto whatever
@@ -142,6 +152,11 @@ W_SOUND:
     ret
 
 DICT_LATEST_INIT_SOUND EQU H_SOUND   ; head of the dictionary once this
-                                      ; file's own word is included
+                                      ; file's own word is included --
+                                      ; see core/soundext.asm for the
+                                      ; five-word convenience layer
+                                      ; some ROMs INCLUDE right after
+                                      ; this file, extending the chain
+                                      ; from here
 
     ENDIF

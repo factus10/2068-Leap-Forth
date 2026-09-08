@@ -2455,6 +2455,11 @@ beyond what each word's own arguments say.
 | `NORMAL` | `( -- )` | Switch back to Normal mode |
 | `BEEP` | `( n-semitones fduration -- )` | Produce a tone |
 | `SOUND` | `( register data -- )` | Write directly to an AY-3-8912 sound-chip register |
+| `TONE` | `( channel period -- )` | Set channel 0/1/2 (A/B/C)'s tone pitch |
+| `VOLUME` | `( channel level -- )` | Set channel 0/1/2's volume (0-15, fixed) |
+| `MIXER` | `( mask -- )` | Choose which tones/noise generators are on |
+| `NOISE` | `( period -- )` | Set the shared noise generator's pitch |
+| `ENVELOPE` | `( period shape -- )` | Set the shared envelope generator's shape |
 
 ```forth
 5 BORDER
@@ -2606,6 +2611,69 @@ different pitch means recomputing that period yourself. There's no
 semitone convenience here on purpose: `SOUND` trades convenience for
 direct access to everything the chip can do — three tones, volume
 envelopes, noise — that `BEEP` was never meant to reach.
+
+`TONE`, `VOLUME`, `MIXER`, `NOISE`, and `ENVELOPE` don't reach
+anything `SOUND` couldn't already reach — they're shorthand for it,
+so you don't have to remember which register pair belongs to which
+channel or work out a fine/coarse split by hand every time:
+
+| Word | Stack effect | What it does |
+|---|---|---|
+| `TONE` | `( channel period -- )` | Set channel 0/1/2 (A/B/C)'s tone pitch |
+| `VOLUME` | `( channel level -- )` | Set channel 0/1/2's volume (0-15, fixed) |
+| `MIXER` | `( mask -- )` | Choose which tones/noise generators are on |
+| `NOISE` | `( period -- )` | Set the shared noise generator's pitch |
+| `ENVELOPE` | `( period shape -- )` | Set the shared envelope generator's shape |
+
+The four-line tone from above becomes:
+
+```forth
+1 251 TONE      \ channel B (1), same pitch as before
+1  15 VOLUME    \ channel B, full volume -- THIS is what you'll hear
+253 MIXER       \ only channel B's tone switched on
+1   0 VOLUME    \ silence it again
+```
+
+One real gap worth knowing before you reach for it: `SOUND` itself
+can never select chip register 0 (channel A's own tone pitch, low
+byte) — its 1-16 numbering, copied faithfully from real BASIC's own
+`SOUND` command, simply has no value that lands there. `TONE` doesn't
+have that gap; `0 period TONE` reaches it directly.
+
+`MIXER`'s mask is the one place these words don't try to be friendlier
+than the chip itself: bit 0 is channel A's tone, bit 1 is B, bit 2 is
+C, bits 3-5 are the three noise generators — and confusingly, on this
+chip, a **0** bit means "on" and a **1** bit means "off." `253` above
+is `$FD`, every bit set except bit 1, which is exactly "everything off
+except channel B's tone."
+
+`NOISE` sets the pitch of a hissing, unpitched sound shared by all
+three channels — `MIXER` still has to switch it onto one of them
+(bits 3-5) before anything comes out, the same "several separate
+switches" reality `SOUND` already needs for an ordinary tone:
+
+```forth
+10 NOISE        \ noise generator's own pitch
+247 MIXER       \ $F7 -- every bit set (off) except bit 3
+                \ (channel A's own noise), which is clear (on)
+0  15 VOLUME    \ channel A, full volume -- THIS is what you'll hear
+0   0 VOLUME    \ silence it again
+```
+
+`ENVELOPE` sets up a rising-and-falling (or repeating, or one-shot)
+volume shape shared by all three channels, but by itself it's
+inaudible — a channel only follows the envelope if you also flip one
+bit `VOLUME` never touches (bit 4 of that channel's own volume
+register), which needs a raw `SOUND` call:
+
+```forth
+500 10 ENVELOPE   \ shape 10: a rising-then-falling triangle
+8 16 SOUND        \ channel A's own volume register (8), bit 4 set --
+                  \ "follow the envelope instead of a fixed level"
+254 MIXER         \ $FE -- only channel A's tone switched on
+0 0 VOLUME        \ silence it again -- also clears bit 4, back to
+                  \ ordinary fixed-volume mode
+```
 
 ### High Resolution Graphics: `HIRES` and `NORMAL`
 
@@ -2877,8 +2945,8 @@ time, without waiting, or a whole line at a time.
 
 Forth words `PLOT`, `LINE`, `CIRCLE`, `FILL`, `CLS`, `BORDER`, `INK`,
 `PAPER`, `BRIGHT`, `FLASH`, `AT-XY`, `HIRES`, `NORMAL`, `BEEP`,
-`SOUND`, `IN`, `OUT`, `UDG`, `KEY`, `KEY?`, `BREAK?`, `STICK`,
-`ACCEPT`, `INPUT`.
+`SOUND`, `TONE`, `VOLUME`, `MIXER`, `NOISE`, `ENVELOPE`, `IN`, `OUT`,
+`UDG`, `KEY`, `KEY?`, `BREAK?`, `STICK`, `ACCEPT`, `INPUT`.
 
 ### Exercises
 
@@ -4466,6 +4534,11 @@ the same convention applied to the full ANS Forth standard.
 | `NORMAL` | `( -- )` |
 | `BEEP` | `( n-semitones fduration -- )` |
 | `SOUND` | `( register data -- )` |
+| `TONE` | `( channel period -- )` |
+| `VOLUME` | `( channel level -- )` |
+| `MIXER` | `( mask -- )` |
+| `NOISE` | `( period -- )` |
+| `ENVELOPE` | `( period shape -- )` |
 | `UDG` | `( n -- addr )` |
 | `64COL` / `32COL` | `( -- )` |
 | `PALETTE64` | `( n -- )` |
