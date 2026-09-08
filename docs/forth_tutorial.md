@@ -2448,6 +2448,8 @@ beyond what each word's own arguments say.
 | `BORDER` | `( color -- )` | Set the screen border to `color` (0-7, same numbering as BASIC's `BORDER`) |
 | `INK` | `( color -- )` | Set the foreground color `PLOT`/`LINE`/`CIRCLE`/`FILL` draw with, and printed text (`EMIT`/`.`/`."`/`TYPE`) prints in, from now on (0-7) |
 | `PAPER` | `( color -- )` | Set the background color the same way |
+| `BRIGHT` | `( flag -- )` | `1` draws `INK`/`PAPER` in their high-intensity shade from now on; `0` returns to normal intensity |
+| `FLASH` | `( flag -- )` | `1` makes `INK`/`PAPER` flash (hardware-blink) from now on; `0` returns to steady |
 | `AT-XY` | `( col row -- )` | Move where the next `EMIT`/`.`/`."` prints to (column 0-31, row 0-22) |
 | `HIRES` | `( -- )` | Switch to High Resolution Graphics mode |
 | `NORMAL` | `( -- )` | Switch back to Normal mode |
@@ -2493,6 +2495,42 @@ The first line prints in red on yellow; the second reverts to black on
 white. Only the cells actually written to change — printing a shorter
 line over a longer one leaves the old color sitting in whatever cells
 weren't touched, same as it leaves old characters sitting there too.
+
+`BRIGHT` works the same way, as a third piece of state alongside `INK`
+and `PAPER` rather than a color of its own — `1` makes whichever
+`INK`/`PAPER` are currently set draw in their lighter, high-intensity
+shade; `0` returns to the normal, darker shade. Like `INK` and `PAPER`,
+it persists until changed and never disturbs the other two:
+
+```forth
+2 INK  1 BRIGHT
+." BRIGHT RED"
+0 BRIGHT
+." NORMAL RED"
+```
+
+The first line prints in bright (light) red; the second prints the
+same ink color 2 (red) but back at normal intensity — `BRIGHT`'s own
+change to intensity didn't touch `INK`'s color, exactly as `INK`
+changing color never touches `PAPER`.
+
+`FLASH` works the same way again, as a fourth independent piece of
+state — `1` makes whichever `INK`/`PAPER` are currently set blink
+(the hardware does the actual blinking, in real time, with no CPU
+involvement once set); `0` returns to steady:
+
+```forth
+2 INK  1 FLASH
+." FLASHING RED"
+0 FLASH
+." STEADY RED"
+```
+
+Same shape as the `BRIGHT` example above: only the flash state
+changes between the two lines, not the color. `BRIGHT` and `FLASH`
+can be combined freely with each other and with `INK`/`PAPER`, since
+each occupies its own bit and none of the four words touch any bit
+but its own.
 
 ### Drawing many things at once
 
@@ -2813,16 +2851,17 @@ tends to suggest.
 ### Summary
 
 Graphics and sound words are thin, single-purpose actions with no
-drawing state to set up beyond their own arguments — except `INK` and
-`PAPER`, which persist until changed and apply to printed text as well
-as to drawing. Two screen colour mechanisms. Ports as a separate
-numbered space from memory, reached with no guard rails at all.
-Characters you define yourself. Reading the keyboard one key at a time,
-without waiting, or a whole line at a time.
+drawing state to set up beyond their own arguments — except `INK`,
+`PAPER`, `BRIGHT`, and `FLASH`, which persist until changed and apply
+to printed text as well as to drawing. Four independent screen colour
+mechanisms, each its own bit, none disturbing the others. Ports as a
+separate numbered space from memory, reached with no guard rails at
+all. Characters you define yourself. Reading the keyboard one key at a
+time, without waiting, or a whole line at a time.
 
 Forth words `PLOT`, `LINE`, `CIRCLE`, `FILL`, `CLS`, `BORDER`, `INK`,
-`PAPER`, `AT-XY`, `HIRES`, `NORMAL`, `BEEP`, `SOUND`, `IN`, `OUT`,
-`UDG`, `KEY`, `KEY?`, `STICK`, `ACCEPT`, `INPUT`.
+`PAPER`, `BRIGHT`, `FLASH`, `AT-XY`, `HIRES`, `NORMAL`, `BEEP`,
+`SOUND`, `IN`, `OUT`, `UDG`, `KEY`, `KEY?`, `STICK`, `ACCEPT`, `INPUT`.
 
 ### Exercises
 

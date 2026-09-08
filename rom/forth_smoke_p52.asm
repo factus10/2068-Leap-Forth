@@ -165,17 +165,17 @@ COLD_START:
     ld   (LATEST), hl
     ld   hl, FORTH_DICT_RAM
     ld   (HERE), hl
-    xor  a
-    ld   (STATE), a
-    ld   (LEAVE_DEPTH), a
     ld   a, DEFAULT_ATTR
     ld   (CURRENT_ATTR), a
 
     xor  a
-    ld   (FAKE_TAPE_WPOS), a
-    ld   (FAKE_TAPE_WPOS+1), a
-    ld   (FAKE_TAPE_RPOS), a
-    ld   (FAKE_TAPE_RPOS+1), a
+    ld   (STATE), a
+    ld   (LEAVE_DEPTH), a
+    ld   hl, 0                    ; one 16-bit zero, reused for both WPOS
+                                  ; and RPOS -- byte-for-byte identical
+                                  ; result to four separate 8-bit stores
+    ld   (FAKE_TAPE_WPOS), hl
+    ld   (FAKE_TAPE_RPOS), hl
 
 ; ---- checkpoint 1: mini round trip -- DOUBLER's own source text ----
     ld   a, 1
@@ -226,6 +226,46 @@ COLD_START:
     ld   de, SRC_LOAD_BJ_LEN
     call INTERPRET_RUN
 
+    ; ---- confirm all 4 rounds' logged outcomes match the independently
+    ; established ground truth (see this file's own header). The 12
+    ; addresses are VPTR's own sequential 2-byte log slots (62120,
+    ; 62122, ... 62142) -- CHECK_MEM16 itself advances HL by 2 after
+    ; each check (see its own comment below), so only the FIRST address
+    ; is loaded explicitly; every check after the first continues
+    ; reading forward from exactly where the previous one left off. Done
+    ; before the FIND check below (an independent verification -- order
+    ; between the two doesn't matter, either failure reports the same
+    ; checkpoint 2 border code) purely so that check's own failure jump
+    ; lands within JR range of FAIL_TEST. ----
+    ld   hl, 62120
+    ld   de, 21
+    call CHECK_MEM16
+    ld   de, 18
+    call CHECK_MEM16
+    ld   de, 4
+    call CHECK_MEM16
+
+    ld   de, 22
+    call CHECK_MEM16
+    ld   de, 20
+    call CHECK_MEM16
+    ld   de, 3
+    call CHECK_MEM16
+
+    ld   de, 21
+    call CHECK_MEM16
+    ld   de, 12
+    call CHECK_MEM16
+    ld   de, 4
+    call CHECK_MEM16
+
+    ld   de, 17
+    call CHECK_MEM16
+    ld   de, 23
+    call CHECK_MEM16
+    ld   de, 1
+    call CHECK_MEM16
+
     ; ---- confirm the rebuilt dictionary actually contains the game:
     ; a real FIND on "MAIN", not just inferring success from the game
     ; having run ----
@@ -233,55 +273,12 @@ COLD_START:
     call DPUSH_HL
     call FIND
     call DPOP_HL                 ; found flag
-    ld   a, l
-    cp   1
-    jp   nz, FAIL_TEST
+    dec  l                       ; l==1 (found) -> nz clear; anything
+    jr   nz, FAIL_TEST           ; else -> nz set, same test as cp 1
     call DPOP_HL                 ; imm flag -- discard
     call DPOP_HL                 ; code addr -- discard
 
-    ; ---- confirm all 4 rounds' logged outcomes match the independently
-    ; established ground truth (see this file's own header) ----
-    ld   hl, 62120
-    ld   de, 21
-    call CHECK_MEM16
-    ld   hl, 62122
-    ld   de, 18
-    call CHECK_MEM16
-    ld   hl, 62124
-    ld   de, 4
-    call CHECK_MEM16
-
-    ld   hl, 62126
-    ld   de, 22
-    call CHECK_MEM16
-    ld   hl, 62128
-    ld   de, 20
-    call CHECK_MEM16
-    ld   hl, 62130
-    ld   de, 3
-    call CHECK_MEM16
-
-    ld   hl, 62132
-    ld   de, 21
-    call CHECK_MEM16
-    ld   hl, 62134
-    ld   de, 12
-    call CHECK_MEM16
-    ld   hl, 62136
-    ld   de, 4
-    call CHECK_MEM16
-
-    ld   hl, 62138
-    ld   de, 17
-    call CHECK_MEM16
-    ld   hl, 62140
-    ld   de, 23
-    call CHECK_MEM16
-    ld   hl, 62142
-    ld   de, 1
-    call CHECK_MEM16
-
-    jp   PASS_TEST
+    jr   PASS_TEST
 
 ; ---- test-harness-only helpers: NOT dictionary words ----
 RESET_AND_POISON:                ; simulates a fresh boot: RAM dictionary
@@ -296,7 +293,9 @@ RESET_AND_POISON:                ; simulates a fresh boot: RAM dictionary
     xor  a
     ld   (STATE), a
     ld   (LEAVE_DEPTH), a
-    ld   hl, FORTH_DICT_RAM
+                                  ; HL is still FORTH_DICT_RAM from the
+                                  ; HERE store above -- nothing between
+                                  ; there and here touches it
     ld   de, FORTH_DICT_RAM+1
     ld   bc, FAKE_TAPE_BUF - FORTH_DICT_RAM - 1
     ld   (hl), $FF
@@ -308,24 +307,31 @@ CHECK_TOP:                       ; DE = expected top-of-stack value
     ld   h, (ix+1)
     or   a
     sbc  hl, de
-    jp   nz, FAIL_TEST
+    jr   nz, FAIL_TEST
     ret
 
 CHECK_MEM16:                     ; HL = address, DE = expected 16-bit
                                   ; value (low byte at HL, high at HL+1,
                                   ; matching this project's own W_FETCH
-                                  ; convention)
+                                  ; convention). Leaves HL advanced past
+                                  ; both bytes on return (address+2) --
+                                  ; deliberate, so a run of checks
+                                  ; against consecutive 2-byte slots
+                                  ; (like the ground-truth block below)
+                                  ; only needs its FIRST address loaded
+                                  ; explicitly.
     ld   a, (hl)
     ld   c, a
     inc  hl
     ld   a, (hl)
     ld   b, a
+    inc  hl
     ld   a, c
     cp   e
-    jp   nz, FAIL_TEST
+    jr   nz, FAIL_TEST
     ld   a, b
     cp   d
-    jp   nz, FAIL_TEST
+    jr   nz, FAIL_TEST
     ret
 
 PASS_TEST:
@@ -389,11 +395,9 @@ FAKE_TAPE_BUF  EQU $B400      ; 7168 bytes, through $CFFF -- see this
                                ; layout reasoning
 
 STORAGE_TEST_SEND_BLOCK:         ; A = type, IX = data ptr, DE = length
-    push af
-    ld   hl, (FAKE_TAPE_WPOS)
-    ld   bc, FAKE_TAPE_BUF
-    add  hl, bc
-    pop  af
+    ld   hl, (FAKE_TAPE_WPOS)     ; none of this touches A -- no need to
+    ld   bc, FAKE_TAPE_BUF        ; save/restore it across the pointer
+    add  hl, bc                   ; computation below
     ld   (hl), a
     inc  hl
     ld   (hl), e
@@ -411,19 +415,25 @@ STORAGE_TEST_SEND_BLOCK:         ; A = type, IX = data ptr, DE = length
     dec  de
     jr   .copyloop
 .copydone:
-    ld   de, FAKE_TAPE_BUF
-    or   a
-    sbc  hl, de
+    or   a                        ; BC is still FAKE_TAPE_BUF -- nothing
+    sbc  hl, bc                   ; in the loop above touches B or C
     ld   (FAKE_TAPE_WPOS), hl
     ret
 
 STORAGE_TEST_RECEIVE_BLOCK:      ; A = expected type, carry-in = load(set)
-                                  ; /verify(clear), IX = dest ptr,
-                                  ; DE = expected length (unused, as in
-                                  ; p7's own identical fake -- the stored
-                                  ; length is authoritative)
+                                  ; /verify(clear) per the real kernel/
+                                  ; storage.asm ABI this fake stands in
+                                  ; for, IX = dest ptr, DE = expected
+                                  ; length (unused, as in p7's own
+                                  ; identical fake -- the stored length
+                                  ; is authoritative). This fake never
+                                  ; distinguishes load from verify (both
+                                  ; always copy), so the carry-in is
+                                  ; accepted for ABI compatibility and
+                                  ; then genuinely unused -- confirmed by
+                                  ; deleting the dead branch it used to
+                                  ; feed and rebuilding clean.
     ld   c, a
-    push af
     ld   hl, (FAKE_TAPE_RPOS)
     ld   de, FAKE_TAPE_BUF
     add  hl, de
@@ -435,9 +445,6 @@ STORAGE_TEST_RECEIVE_BLOCK:      ; A = expected type, carry-in = load(set)
     inc  hl
     ld   d, (hl)
     inc  hl
-    pop  af
-    jr   c, .do_receive
-.do_receive:
 .copyloop:
     ld   a, d
     or   e
@@ -456,7 +463,6 @@ STORAGE_TEST_RECEIVE_BLOCK:      ; A = expected type, carry-in = load(set)
     or   a
     ret
 .fail:
-    pop  af
     scf
     ret
 
@@ -500,7 +506,7 @@ DICT_CHAIN_POINT DEFL H_DOTQUOTE
     INCLUDE "core/loop.asm"
 DICT_CHAIN_POINT DEFL H_REPEAT
     INCLUDE "core/color.asm"
-DICT_CHAIN_POINT DEFL H_PAPER
+DICT_CHAIN_POINT DEFL H_FLASH
     INCLUDE "core/doloop.asm"
 DICT_CHAIN_POINT DEFL H_I
     INCLUDE "core/loopext.asm"

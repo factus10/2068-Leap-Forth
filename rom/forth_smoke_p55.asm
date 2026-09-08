@@ -242,7 +242,7 @@ DICT_CHAIN_POINT DEFL H_CLS         ; NOT H_BORDER: that's core/ts2068.asm's
     INCLUDE "core/print.asm"
 DICT_CHAIN_POINT DEFL H_DOT
     INCLUDE "core/color.asm"
-DICT_CHAIN_POINT DEFL H_PAPER
+DICT_CHAIN_POINT DEFL H_FLASH
     INCLUDE "core/moregfx.asm"
 DICT_CHAIN_POINT DEFL H_ATXY
     INCLUDE "core/hires.asm"

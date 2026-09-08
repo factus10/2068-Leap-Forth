@@ -385,7 +385,7 @@ DICT_CHAIN_POINT DEFL H_DOTQUOTE
     INCLUDE "core/loop.asm"
 DICT_CHAIN_POINT DEFL H_REPEAT
     INCLUDE "core/color.asm"
-DICT_CHAIN_POINT DEFL H_PAPER
+DICT_CHAIN_POINT DEFL H_FLASH
     INCLUDE "core/doloop.asm"
 
 DICT_LATEST_INIT_P57 EQU H_I   ; head of the dictionary once this ROM's

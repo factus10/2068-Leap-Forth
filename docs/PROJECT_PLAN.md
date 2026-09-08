@@ -3560,6 +3560,134 @@ depends on it, and it doesn't block anything currently planned either.
 written — Phase 32 closed it with real register-level access; see that
 phase's own section above.)
 
+## Phase 60 — BRIGHT
+
+**Status: implemented, assembles clean across every affected ROM,
+dictionary-chain-verified. NOT yet confirmed under real Fuse** — see
+the honest gap noted below; every other phase in this document could
+say "confirmed under real Fuse," this one can't yet, stated plainly
+rather than glossed over.
+
+A real gap found by direct source inspection (not guessed): `INK`/
+`PAPER` (Phase 15, `core/color.asm`) explicitly documented "no words
+for bright or flash yet," and `include/sysvars.inc` had reserved a
+`CURRENT_BRIGHT` byte since this file was first copied from the
+sibling BASIC project, unused the entire time. Added
+`BRIGHT ( flag -- )` to `core/color.asm` immediately after `PAPER`,
+same pattern exactly: `and $01` (only bit 0 meaningful, matching
+`INK`/`PAPER`'s own "no range checking" scope), shift into bit 6,
+read-modify-write against `CURRENT_ATTR` with the other bits masked
+out and preserved, so `BRIGHT` can never undo `INK`/`PAPER` and vice
+versa. Deliberately does NOT use the reserved `CURRENT_BRIGHT` byte —
+folding straight into `CURRENT_ATTR` matches `INK`/`PAPER`'s own
+established style more closely than resurrecting a separate cell, so
+`CURRENT_BRIGHT` remains unused after this phase too (see the sysvars
+dead-symbol audit below).
+
+`FLASH` (bit 7) still has no word — out of scope for this phase,
+tracked as its own open item now rather than left implicit the way
+`BRIGHT` was before someone asked about it directly.
+
+**Dictionary wiring**: `H_BRIGHT` chains after `H_PAPER`
+(`DICT_LATEST_INIT_COLOR` updated to `H_BRIGHT`); every one of the ten
+files that continues the chain past `core/color.asm` (`rom/
+forth_boot.asm` and nine `rom/forth_smoke_p*.asm`/`forth_demo_
+blackjack.asm` ROMs) had its own `DICT_CHAIN_POINT DEFL H_PAPER`
+mechanically updated to `H_BRIGHT` — found by grepping every
+`core/color.asm` include site directly, not assumed from `rom/
+forth_boot.asm` alone. `rom/forth_boot.asm`'s own dictionary-walk
+comment (see that file's header) was re-derived the same way it
+instructs — actually assembling the ROM and walking the real `LINK`
+chain in the compiled binary, byte for byte, from
+`DICT_LATEST_INIT_LOADTEXT` down to the sentinel — rather than
+incrementing the word count by eye (the exact habit that let it drift
+twice before): 141 unique names, zero duplicates, `BRIGHT` confirmed
+present and correctly linked between `PAPER` and the word before it.
+
+**Smoke ROM**: `rom/forth_smoke_p60.asm`, same three-checkpoint
+structure and verification method as Phase 15's own `rom/
+forth_smoke_p15.asm` (real screen-attribute readback via `kernel/
+graphics`'s `GFX_CELL_ATTR_ADDR`, not just `CURRENT_ATTR` state) —
+checkpoint 1 sets ink+bright together and confirms paper is
+undisturbed; checkpoint 2 clears bright alone and confirms ink/paper
+both survive (the read-modify-write proof, mirroring `PAPER`'s own
+Phase 15 checkpoint 2); checkpoint 3 resets all three to default via
+`LINE` and confirms an exact byte match against `DEFAULT_ATTR`. Builds
+clean (`make forth-smoke-p60`, 0 errors).
+
+**The honest gap**: real Fuse confirmation was attempted this session
+and abandoned, not skipped — `fuse --machine ts2068` launched
+correctly (confirmed via its own X11 window appearing at the right
+geometry), but capturing its rendered output (`ffmpeg -f x11grab`)
+returned solid black across the whole window on every attempt, most
+likely because this Fuse build's rendering surface isn't visible to
+plain X11 window capture in this environment (a GL-accelerated
+backend bypassing the classic X pixmap is the leading suspect, not
+confirmed). No amount of retrying the capture changes what the ROM
+itself does, so this is an environment/tooling gap, not evidence
+against the code — but it means checkpoint pass/fail was never
+actually observed running, only assembled and hand/chain-verified.
+Whoever next has working Fuse screenshot access: run `make
+forth-smoke-p60`, launch it in Fuse, and confirm green (`4`) — same
+bar every other phase already cleared.
+
+ROM budget after this phase: `rom/forth_boot.asm` uses 15680 of 16384
+bytes ($3D40 of $4000), 704 bytes free — +32 bytes over the prior
+build (measured directly: a disposable worktree at the prior commit
+gave 15648/736 free before this phase).
+
+## Phase 61 — FLASH
+
+**Status: implemented, assembles clean across every affected ROM,
+dictionary-chain-verified. Same honest Fuse gap as Phase 60** — not
+independently re-attempted this session; the same environment
+limitation applies equally here.
+
+Same session as Phase 60, same shape of gap, found the same way:
+asked directly whether `include/sysvars.inc`'s dead-symbol audit
+(below) was hiding another missing feature the way `CURRENT_BRIGHT`
+had. `CURRENT_FLASH` was the answer — bit 7 of `CURRENT_ATTR` always
+existed, was always left untouched by `INK`/`PAPER`/`BRIGHT`, and had
+no word. Added `FLASH ( flag -- )` to `core/color.asm` immediately
+after `BRIGHT`, identical pattern: `and $01`, shift into bit 7 (seven
+`add a,a`, one more than `BRIGHT`'s six), read-modify-write against
+`CURRENT_ATTR` with every other bit masked out and preserved.
+
+Deliberately does NOT use the reserved `CURRENT_FLASH` byte, same
+reasoning as `BRIGHT` declined `CURRENT_BRIGHT` — folding straight
+into `CURRENT_ATTR` matches this file's own established style. Both
+reserved bytes are confirmed genuinely dead after this phase (see the
+sysvars trim below) — not because the capability is missing, but
+because this file's own convention never used a separate cell for any
+of `INK`/`PAPER`/`BRIGHT`/`FLASH` in the first place.
+
+**Explicitly not the same thing as the flashing cursor** (Phase 33):
+that already sets bit 7 directly via `GFX_INVERT_ATTR` on its own
+screen cell, unrelated to `CURRENT_ATTR`, and is unaffected by this
+word either way — `FLASH` gives the same hardware effect to ordinary
+`INK`/`PAPER`-colored output, not to the cursor.
+
+**Dictionary wiring**: `H_FLASH` chains after `H_BRIGHT`
+(`DICT_LATEST_INIT_COLOR` updated to `H_FLASH`); the same ten
+chain-continuation sites Phase 60 updated were updated again, `H_BRIGHT`
+-> `H_FLASH`. Re-derived the word count the same way Phase 60's own
+header now insists on (not by eye): 142 unique names, zero duplicates,
+`FLASH` confirmed linked between `BRIGHT` and `PAPER`.
+
+**Smoke ROM**: `rom/forth_smoke_p61.asm`, identical three-checkpoint
+structure to Phase 60's own `rom/forth_smoke_p60.asm`, real
+`GFX_CELL_ATTR_ADDR` readback against bit 7 instead of bit 6. Builds
+clean (`make forth-smoke-p61`, 0 errors). Same Fuse-confirmation gap
+as Phase 60 — assembled and chain-verified, not yet observed running.
+
+ROM budget after this phase: `rom/forth_boot.asm` uses 15712 of 16384
+bytes ($3D60 of $4000), 672 bytes free — +32 bytes over Phase 60,
+same cost as `BRIGHT` itself (one more `add a,a` than `BRIGHT`, offset
+by one fewer header byte since `"FLASH"` and `"BRIGHT"` differ in
+length by one character... measured directly, not derived from that
+arithmetic: a disposable worktree at the Phase-60 commit gave
+15680/704 free before this phase, matching the number above exactly).
+
 ## Testing discipline
 
 Carry forward the validated order from 2068-Leap, applied to Forth

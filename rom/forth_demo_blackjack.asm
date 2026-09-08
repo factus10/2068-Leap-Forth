@@ -320,7 +320,7 @@ DICT_CHAIN_POINT DEFL H_DOTQUOTE
                                       ; included above
 DICT_CHAIN_POINT DEFL H_REPEAT
     INCLUDE "core/color.asm"
-DICT_CHAIN_POINT DEFL H_PAPER
+DICT_CHAIN_POINT DEFL H_FLASH
     INCLUDE "core/doloop.asm"
 DICT_CHAIN_POINT DEFL H_I
     INCLUDE "core/loopext.asm"
