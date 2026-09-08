@@ -280,10 +280,8 @@ IO_SCAN_TABLE:       DEFS 8           ; 8 bytes — one per keyboard matrix row,
                                  ; don't eyeball it" discipline
 
 ; ---- kernel/editor internal scratch ----
-EDIT_PROGRAM_POS:    DEFS 2           ; 2 bytes — program-area position this
                                  ; edit session belongs to, set by
                                  ; EDITOR_ENTER, read by EDITOR_EXIT
-EDIT_CONTENT_LEN:    DEFS 1           ; 1 byte — scratch result of scanning
                                  ; EDIT_LINE_BUF for its null terminator,
                                  ; shared by EDITOR_INSERT_CHAR/DELETE_CHAR/
                                  ; MOVE_CURSOR rather than each re-deriving
@@ -301,7 +299,6 @@ TOKEN_BUF:           DEFS 130         ; 130 bytes — 2-byte length prefix + up
                                  ; matching EDIT_LINE_BUF's max content
                                  ; (EDIT_LINE_BUF_LEN-1); see
                                  ; basic/basic.asm's BASIC_TOKENIZE_LINE
-PRINT_BUF:           DEFS 64          ; 64 bytes (63 chars + null) — scratch
                                  ; for one PRINT string-literal argument
                                  ; before handing it to GFX_PRINT_STRING.
                                  ; Widened from 32 (2026-08-23): a 39-char
@@ -318,7 +315,6 @@ PRINT_BUF:           DEFS 64          ; 64 bytes (63 chars + null) — scratch
                                  ; itself, for AT-positioned prints and
                                  ; any future use of the captured text
                                  ; beyond just this one draw call.
-BASIC_OUTPUT_ROW:    DEFS 1           ; 1 byte — next screen row a PRINT
                                  ; statement writes to; no scrolling yet
 ; VAR_TABLE (26 fixed 2-byte numeric-scalar slots) lived here through
 ; Phase 3 — retired in Phase 4 (2026-08-23), moved into the dynamic
@@ -329,7 +325,6 @@ BASIC_OUTPUT_ROW:    DEFS 1           ; 1 byte — next screen row a PRINT
 INPUT_BUF:           DEFS 8           ; 8 bytes — raw digit accumulation for
                                  ; INPUT (sign + up to 5 digits + null),
                                  ; before parsing into a variable
-CUR_VAR_LETTER:      DEFS 1           ; 1 byte — which variable letter the
                                  ; current INPUT or assignment statement
                                  ; targets. Stashed in memory rather
                                  ; than a register — originally named
@@ -461,8 +456,6 @@ EDIR_LEFT           EQU 2
 EDIR_RIGHT          EQU 3
 EDIR_HOME           EQU 4       ; start of current line
 EDIR_END            EQU 5       ; end of current line
-EDIR_TOP            EQU 6       ; top of program
-EDIR_BOTTOM         EQU 7       ; bottom of program
 ; pseudo-directions for EDITOR_NAV_HOOK only — EDITOR_MOVE_CURSOR has
 ; no meaning for these at all, unlike EDIR_UP/DOWN above (which it
 ; DOES implement, even though basic/'s hook currently intercepts them
@@ -517,7 +510,6 @@ STATUS_WRITE_PTR:    DEFS 2           ; 2 bytes — current write position
                                  ; BASIC_NUM_TO_STRING calls, which
                                  ; destroy DE (same lesson as
                                  ; everywhere else in this project)
-STATUS_TOTAL_TMP:    DEFS 2           ; 2 bytes — total statement count,
                                  ; stashed here since it's needed after
                                  ; an intervening BASIC_NUM_TO_STRING
                                  ; call that would otherwise clobber it
@@ -633,7 +625,6 @@ PENDING_ERROR_MSG:   DEFS 2           ; 2 bytes — holds a pointer to the
                                  ; the gap the old 1-byte flag left
                                  ; before ERR_MSG_PTR — no sysvar
                                  ; addresses needed to move
-ERR_MSG_PTR:         DEFS 2           ; 2 bytes — BASIC_REPORT_ERROR's own
                                  ; stash for the caller's message
                                  ; pointer. A real bug shipped once
                                  ; already: the caller sets HL to the
@@ -647,7 +638,6 @@ ERR_MSG_PTR:         DEFS 2           ; 2 bytes — BASIC_REPORT_ERROR's own
                                  ; in the very routine meant to help
                                  ; catch this class of thing
 
-IDENT_WRITE_PTR:     DEFS 2           ; 2 bytes — current write position
                                  ; while BASIC_PARSE_IDENTIFIER fills
                                  ; DETOK_BUF (reused as scratch space
                                  ; here — it's already 128 bytes, safe
@@ -711,7 +701,6 @@ LINE_IS_ERROR:       DEFS 1           ; 1 byte — BASIC_REDRAW_PROGRAM's own
                                  ; live in one) — checked afterward to
                                  ; decide whether to color that row's
                                  ; ink red
-WRAP_TARGET:         DEFS 2           ; 2 bytes — BASIC_FIND_PREV_ERROR's
                                  ; own scratch, remembering the last
                                  ; entry in CHECK_ERROR_LIST before its
                                  ; backward scan begins, so it has
@@ -788,13 +777,11 @@ IF_SCAN_POS:         DEFS 2           ; 2 bytes — BASIC_IF_SCAN_STEP/
                                  ; that must survive across them lives
                                  ; in memory, reloaded fresh each step,
                                  ; never carried in a bare register
-IF_SCAN_DEPTH:       DEFS 1           ; 1 byte — nesting depth while
                                  ; scanning forward past a false IF/
                                  ; ELSEIF condition or past a taken
                                  ; branch's body; only ELSE/ELSEIF seen
                                  ; at depth 0 belong to the block being
                                  ; resolved, not some inner nested IF
-IF_TEMP_RESULT:      DEFS 1           ; 1 byte — BASIC_STMT_IF's own
                                  ; condition result (always exactly 0
                                  ; or 1), saved here because matching
                                  ; the following THEN keyword destroys
@@ -820,21 +807,17 @@ CURRENT_PAPER:       DEFS 1           ; 1 byte, 0-7, default 7 (white) —
                                  ; fits the gap's last free byte
                                  ; ($608E-$608F were the only 2 bytes
                                  ; free before this change)
-CURRENT_FLASH:       DEFS 1           ; 1 byte, 0/1, default 0
-CURRENT_INVERSE:     DEFS 1           ; 1 byte, 0/1, default 0 — swaps ink/
                                  ; paper when BASIC_COMPUTE_PRINT_ATTR
                                  ; builds the attribute byte, rather
                                  ; than being folded into CURRENT_INK/
                                  ; PAPER directly, so the underlying
                                  ; ink/paper values survive INVERSE
                                  ; being toggled back off later
-CURRENT_OVER:        DEFS 1           ; 1 byte, 0/1, default 0 — stored for
                                  ; static-checker validation and consumed
                                  ; by BASIC's PRINT path: OVER 1 XOR-plots
                                  ; glyph pixels onto the existing bitmap.
 
 ; ---- AT/TAB cursor positioning ----
-BASIC_OUTPUT_COL:    DEFS 1           ; 1 byte, 0-31, default 0 — column
                                  ; companion to BASIC_OUTPUT_ROW
                                  ; ($5EE9, no free byte adjacent to it,
                                  ; hence living here instead). Read by
@@ -1049,7 +1032,6 @@ STORAGE_HEADER_FILENAME_LEN EQU 10 ; NOT a sysvar address — a plain
                                  ; calling into EXROM — same shared-
                                  ; constant pattern as STORAGE_MAX_LEN
                                  ; below.
-STORAGE_PROGRAM_TYPE   EQU 0
 STORAGE_EXTENSION_TYPE EQU 4
 STORAGE_REQUEST_TYPE: DEFS 1      ; requested header type for SAVE/LOAD
 STORAGE_CMD_INVALID_FLAG:DEFS 1          ; 1 byte, 0/1 — SAVE/LOAD command
@@ -1139,18 +1121,15 @@ STORAGE_PROGRESS_HOOK:DEFS 2           ; 2 bytes — address of a caller-
 ; its own original addresses and appending this feature's block
 ; immediately after, rather than interleaving or arbitrarily
 ; reordering either side.
-BOUNDARY_IN_STRING:  DEFS 1           ; 1 byte, 0/1 — BASIC_FIND_
                                  ; STATEMENT_BOUNDARY's own toggle,
                                  ; tracking whether the scan is
                                  ; currently inside a quoted string
                                  ; literal (a ':' inside one is just
                                  ; text, never a real separator)
-MULTI_SEG_START:     DEFS 2           ; 2 bytes — current segment's start
                                  ; position, held here (not a
                                  ; register) since BASIC_FIND_
                                  ; STATEMENT_BOUNDARY's own scan
                                  ; destroys HL
-MULTI_SEG_END:       DEFS 2           ; 2 bytes — current segment's
                                  ; boundary position (pointing AT the
                                  ; ':' or the terminating $0D),
                                  ; returned by BASIC_FIND_STATEMENT_
@@ -1158,7 +1137,6 @@ MULTI_SEG_END:       DEFS 2           ; 2 bytes — current segment's
                                  ; the copy-loop's own end check and
                                  ; for computing where the NEXT
                                  ; segment starts afterward
-MULTI_SEG_BOUNDARY_CHAR:DEFS 1           ; 1 byte — which character
                                  ; BASIC_FIND_STATEMENT_BOUNDARY
                                  ; actually stopped at (':' or $0D) —
                                  ; needed to decide whether to keep
@@ -1187,13 +1165,11 @@ MULTI_STMT_BUF       EQU TOKEN_BUF
     ASSERT EDIT_LINE_BUF_LEN <= 128
 
 ; ---- built-in function calls in expressions (ABS(x), SGN(x), MOD(x,y), ...) ----
-FUNC_CALL_HANDLER:   DEFS 2           ; 2-byte handler address from
                                  ; FUNCTION_TABLE. BASIC_EVAL_PRIMARY
                                  ; snapshots it on the Z80 stack before
                                  ; recursively parsing arguments, so a
                                  ; nested function may safely overwrite
                                  ; this shared lookup result.
-FUNC_CALL_ARGC:      DEFS 1           ; 1 byte — how many arguments the
                                  ; matched function takes (1 or 2),
                                  ; set alongside FUNC_CALL_HANDLER by the
                                  ; same BASIC_TRY_EVAL_FUNCTION table
@@ -1403,7 +1379,6 @@ PORT_FF_SHADOW:      DEFS 1          ; 1 byte
 ; ATTR_EXT never cared which bits their caller set — but nothing ever
 ; set it, since no statement existed to. BASIC_COMPUTE_PRINT_ATTR now
 ; reads this the same way it already reads CURRENT_FLASH.
-CURRENT_BRIGHT:      DEFS 1          ; 1 byte, 0/1, default 0
 
 ; GFX_FILL_* — FILL's own state, incl. its bounded flood-fill stack.
 ; Deliberately NOT recursive and NOT unbounded — real hardware has no
@@ -1546,9 +1521,7 @@ ROWS_BEFORE_PTR:     DEFS 2           ; 2 bytes — running statement
 ; this loop's own pointer walks from VIEW_TOP_INDEX forward — a
 ; different position than where BASIC_ROWS_BEFORE_INDEX's own walk
 ; ends up (CUR_EDIT_INDEX's statement).
-SCROLL_ROWS_BEFORE:  DEFS 2           ; 2 bytes — running total, updated
                                    ; incrementally instead of resummed
-SCROLL_TOP_PTR:      DEFS 2           ; 2 bytes — position of whatever
                                    ; statement currently sits at
                                    ; VIEW_TOP_INDEX, advanced one
                                    ; MEM_LINE_NEXT per loop iteration
@@ -1569,12 +1542,9 @@ SCROLL_TOP_PTR:      DEFS 2           ; 2 bytes — position of whatever
 ; Bounded at 23 entries — WRAP_MAX_ROWS (8) means no more than 23
 ; statements could ever fit in the 23-row view even if every one were
 ; a single row, so this is a hard ceiling, not a guess.
-ROW_COUNT_CACHE:     DEFS 23          ; 23 bytes — one row-count per
                                    ; statement, in VIEW_TOP_INDEX order
-ROW_COUNT_CACHE_LEN: DEFS 1           ; 1 byte — how many entries above
                                    ; are valid this redraw (written by
                                    ; BASIC_ROWS_BEFORE_INDEX)
-RENDER_CACHE_IDX:    DEFS 1           ; 1 byte — BASIC_REDRAW_PROGRAM's
                                    ; own read position into the cache,
                                    ; reset to 0 at the top of every
                                    ; render pass
@@ -1601,14 +1571,11 @@ GFX_SCROLL_SRC_ROW:  DEFS 1           ; 1 byte — source row (0-22)
 ; NEW, RUN, LOAD, HELP, ...) correctly disables the fast path for the
 ; next redraw too, same "when in doubt, fall back to the slow path"
 ; discipline the fast-scroll integration follows throughout.
-LAST_VIEW_TOP_INDEX: DEFS 2           ; 2 bytes
 
 ; BASIC_REDRAW_PROGRAM's own fast-scroll path (same pass as LAST_VIEW_
 ; TOP_INDEX above) — pure scratch, both written and consumed entirely
 ; within one redraw, never needs resetting between redraws
-FAST_SCROLL_NEW_ROW: DEFS 1           ; 1 byte — row the newly-scrolled-
                                  ; into-view active line lands on
-FAST_SCROLL_OLD_POS: DEFS 2           ; 2 bytes — program position of
                                  ; the statement that WAS the active
                                  ; line before this scroll (now
                                  ; settled — needs a highlighted
@@ -1767,15 +1734,12 @@ FRAMES:              DEFS 2           ; 2 bytes
 ; cleared) by both BASIC_SCAN_LABELS_EXROM and BASIC_FULL_CHECK_EXROM,
 ; since either can change which statement positions are flagged or
 ; shift positions outright.
-STATUS_CHECK_VALID:  DEFS 1           ; 1 byte — nonzero: the two
                                      ; fields below hold a real,
                                      ; still-current result; zero:
                                      ; ignore them, a fresh check is
                                      ; needed
-STATUS_CHECK_CACHED_POS:DEFS 2           ; 2 bytes — the CUR_EDIT_POS
                                      ; value the cached result below
                                      ; was computed for
-STATUS_CHECK_CACHED_MSG:DEFS 2           ; 2 bytes — the PENDING_ERROR_MSG
                                      ; value BASIC_CHECK_STATEMENT_
                                      ; EXROM produced for that position
 
@@ -1795,7 +1759,6 @@ STATUS_CHECK_CACHED_MSG:DEFS 2           ; 2 bytes — the PENDING_ERROR_MSG
 ; silently misbehaving — see that routine's own header for the full
 ; reasoning (this project's lesson 10: diagnose with real values, not
 ; guesses).
-EXROM_KTAB_MISMATCH_FLAG:DEFS 1           ; 1 byte — 0 = never tripped;
                                      ; $FF = EXROM_VERIFY_KTAB_MAGIC
                                      ; found a mismatch and halted —
                                      ; visible from a debug.bin dump
@@ -1812,9 +1775,7 @@ EXROM_KTAB_MISMATCH_FLAG:DEFS 1           ; 1 byte — 0 = never tripped;
 ; carry "which sysvar, what mask" through the call from the stub into
 ; the shared body. These two cells do that instead, set by the stub
 ; immediately before the shared body runs.
-STMT_TARGET_ADDR:    DEFS 2           ; 2 bytes — sysvar address the parsed
                                 ; value gets masked and stored into
-STMT_TARGET_MASK:    DEFS 1           ; 1 byte — AND mask applied before
                                 ; storing (e.g. $07 for INK/PAPER,
                                 ; $01 for the boolean attributes,
                                 ; $1F for TAB)
@@ -1861,7 +1822,6 @@ SPRITE_SLOT_MAX     EQU 8       ; number of slots (0-7). Doubled from
                                 ; image/background buffers now live at
                                 ; $E800-$F0FF; only the small per-slot
                                 ; metadata remains below PROG_AREA_START.
-SPRITE_CELL_MAX     EQU 4       ; max cells per dimension per slot
 SPRITE_SLOT_BYTES   EQU 144     ; SPRITE_CELL_MAX*SPRITE_CELL_MAX*9
                                 ; (GFX_SPRITE_CAPTURE/DRAW's own 9-
                                 ; bytes-per-cell buffer format)
@@ -1874,18 +1834,13 @@ SPRITE_SLOT_SHOWN:   DEFS 8           ; 8 bytes (1/slot) — currently drawn
                                 ; otherwise; SHOW refuses if already
                                 ; shown — call MOVE, or HIDE then SHOW,
                                 ; to reposition a shown sprite)
-SPRITE_SLOT_W:       DEFS 8           ; 8 bytes (1/slot) — width in cells,
                                 ; as given to the slot's own GRAB
                                 ; (1-4)
-SPRITE_SLOT_H:       DEFS 8           ; 8 bytes (1/slot) — height in cells
                                 ; (1-4)
-SPRITE_SLOT_ROW:     DEFS 8           ; 8 bytes (1/slot) — current display
                                 ; row, meaningful only while SHOWN
                                 ; (HIDE/MOVE need this to know where
                                 ; the saved background goes back)
-SPRITE_SLOT_COL:     DEFS 8           ; 8 bytes (1/slot) — same, column
 SPRITE_DISPLAY_DEPTH: DEFS 1          ; number of slots currently shown
-SPRITE_DISPLAY_STACK: DEFS 8          ; slot numbers in SHOW order;
                                 ; save-under restoration must pop these
                                 ; in reverse order to preserve overlaps
 ; The two large buffers are persistent across EXROM calls, so they live in
@@ -1914,11 +1869,6 @@ SPRITE_SLOT_BG_BUF   EQU $EC80         ; 1152 bytes — saved background
 ; coordinate parsing) before the next BASIC_EXPECT_COMMA_EXPR call
 ; destroys BC/DE/HL. Shared between GRAB and SHOW (never both live at
 ; once — one statement's parse completes before the next begins).
-SPRITE_ARG_SLOT:     DEFS 1           ; 1 byte
-SPRITE_ARG_ROW:      DEFS 1           ; 1 byte
-SPRITE_ARG_COL:      DEFS 1           ; 1 byte
-SPRITE_ARG_W:        DEFS 1           ; 1 byte
-SPRITE_ARG_H:        DEFS 1           ; 1 byte
 
 ; GFX_FILL's per-pixel visited-tracker — see GFX_FILL's own header
 ; (kernel/graphics/graphics.asm) for why this has to be a separate
@@ -1988,33 +1938,20 @@ GFX_FILL_VISITED     EQU $5B00         ; 6144 bytes, through $72FF
 ; match FOR_STACK's own margin-over-minimum sizing (8 entries) —
 ; real RPN expressions peak around 3-4 deep, so this is generous
 ; headroom, not a tight fit; bump this EQU later if it's ever too small.
-CALC_STACK:          DEFS 40          ; 40 bytes (8 slots x 5-byte float)
-CALC_SP:             DEFS 1           ; 1 byte — stack index, 0 = empty
 ; The original calculator design reserved six five-byte mem-N slots here.
 ; No implemented dispatcher operation reads or writes them: SQR/SIN use the
 ; explicit Home-side fields below instead of the ROM SERIES generator. Remove
 ; the unused 30-byte block; add it back only with an implemented st/get-mem op.
-CALC_BREG:           DEFS 1           ; 1 byte — mirrors the real ROM's BREG:
                                 ; recursive-entry counter used by
                                 ; GEN_ENT_1/GEN_ENT_2 so a nested
                                 ; CALCULATE call (e.g. SERIES calling
                                 ; back into itself) doesn't disturb the
                                 ; outer call's own op counter
-CALC_TRUNC_FLAG:     DEFS 1           ; set by CALC_FP_TO_INT: 1 when the
                                 ; result exceeded signed 16-bit range, 0
                                 ; otherwise; simulator-observed calculator
                                 ; boundary status alongside carry/error code
 ; Calculator error codes. CALC_ERROR_CODE aliases the original diagnostic
 ; byte so the hardening pass changes no RAM addresses.
-CALC_ERR_NONE              EQU 0
-CALC_ERR_INVALID_LITERAL   EQU 1
-CALC_ERR_STACK_UNDERFLOW   EQU 2
-CALC_ERR_STACK_OVERFLOW    EQU 3
-CALC_ERR_DIVISION_BY_ZERO  EQU 4
-CALC_ERR_NUMERIC_OVERFLOW  EQU 5
-CALC_ERR_UNIMPLEMENTED     EQU 6
-CALC_UNIMPLEMENTED_LITERAL_FLAG:DEFS 1         ; retained ABI name
-CALC_ERROR_CODE       EQU CALC_UNIMPLEMENTED_LITERAL_FLAG
                                 ; nonzero CALC_ERR_* value. RST $28
                                 ; failures scan to END-CALC and return
                                 ; through the normal paging trampoline;
@@ -2032,7 +1969,6 @@ CALC_ERROR_CODE       EQU CALC_UNIMPLEMENTED_LITERAL_FLAG
                                 ; purpose ($80+) path can't be
                                 ; recovered the same way); that historical
                                 ; detail value is no longer stored.
-CALC_LITERAL_PTR:    DEFS 2           ; 2 bytes — current position in the RST
                                 ; $28 literal-byte stream. Added 2026-
                                 ; 08-20 when the dispatcher was reworked
                                 ; away from the real ROM's EXX/EX (SP),HL
@@ -2049,7 +1985,6 @@ CALC_LITERAL_PTR:    DEFS 2           ; 2 bytes — current position in the RST
                                 ; for full simulator-testability plus
                                 ; removing a whole class of "which
                                 ; register bank is live right now" bugs
-CALC_OP1_PTR:        DEFS 2           ; 2 bytes — first-operand pointer,
                                 ; recomputed fresh from CALC_SP on EVERY
                                 ; dispatch iteration (not carried
                                 ; incrementally like the real ROM's HL) —
@@ -2064,12 +1999,10 @@ CALC_OP1_PTR:        DEFS 2           ; 2 bytes — first-operand pointer,
                                 ; very next dispatch, not several ops
                                 ; later. Each op routine's own first
                                 ; instruction is `LD HL,(CALC_OP1_PTR)`
-CALC_OP2_PTR:        DEFS 2           ; 2 bytes — second-operand pointer
                                 ; (binary ops only), same recompute-
                                 ; fresh-every-time reasoning as CALC_
                                 ; OP1_PTR above. Binary op routines load
                                 ; it via `LD DE,(CALC_OP2_PTR)`
-CALC_LITERAL_PARAM:  DEFS 1           ; 1 byte — the 5-bit parameter CALC_
                                 ; SCAN_ENT extracts for "multi-purpose"
                                 ; literals (get-mem-N, st-mem-N, etc.,
                                 ; literal value >=$80) — not read by any
@@ -2080,7 +2013,6 @@ CALC_LITERAL_PARAM:  DEFS 1           ; 1 byte — the 5-bit parameter CALC_
                                 ; regardless, so it needs a home now
                                 ; rather than a redesign when the first
                                 ; parameterized op (e.g. get-mem-3) lands
-CALC_STACK_OVERFLOW_FLAG:DEFS 1         ; 1 byte — diagnostic stack depth at
                                 ; the moment `duplicate` (literal $31)
                                 ; found no room left (CALC_SP already at
                                 ; the 8-slot cap). CALC_ERROR_CODE carries
@@ -2097,7 +2029,6 @@ CALC_STACK_OVERFLOW_FLAG:DEFS 1         ; 1 byte — diagnostic stack depth at
 
 ; ---- Real arithmetic (add/sub/multiply) + INT_TO_FP/FP_TO_INT, added
 ; 2026-08-21. All scratch, no persistent state carried between calls.
-CALC_UNP_A:          DEFS 6           ; 6 bytes — unpacked-float record for
                                 ; operand A: byte0=sign ($00/$FF,
                                 ; matching the float format's own small-
                                 ; int-form convention), byte1=biased
@@ -2110,23 +2041,18 @@ CALC_UNP_A:          DEFS 6           ; 6 bytes — unpacked-float record for
                                 ; Also doubles as the RESULT record for
                                 ; every op below — the final answer
                                 ; always ends up here before CALC_PACK.
-CALC_UNP_B:          DEFS 6           ; 6 bytes — same layout, operand B
-CALC_SHIFT_COUNT:    DEFS 1           ; 1 byte — scratch shift/loop counter,
                                 ; shared across CALC_UNPACK's
                                 ; normalization loop and the add/sub
                                 ; engine's alignment-shift loop (never
                                 ; live across a call boundary, so one
                                 ; shared byte is safe — same reasoning
                                 ; already applied to CALC_LITERAL_PARAM)
-CALC_MUL_ACC:        DEFS 8           ; 8 bytes — 64-bit product accumulator
                                 ; for CALC_OP_MUL's shift-add multiply,
                                 ; byte0=LSB..byte7=MSB
-CALC_MUL_CAND:       DEFS 8           ; 8 bytes — 64-bit shifting multiplicand
                                 ; for the same routine (top 4 bytes
                                 ; start zero, bottom 4 = operand A's
                                 ; mantissa, then shifts left each of the
                                 ; 32 iterations)
-CALC_DIV_REM:        DEFS 4           ; 4 bytes — 32-bit remainder for
                                 ; CALC_OP_DIV's shift-subtract mantissa
                                 ; divide, MSB-first (matching CALC_UNP_*'s
                                 ; own mantissa byte order). Starts as the
@@ -2135,7 +2061,6 @@ CALC_DIV_REM:        DEFS 4           ; 4 bytes — 32-bit remainder for
                                 ; header), shifted left and conditionally
                                 ; reduced by the divisor mantissa once per
                                 ; iteration.
-CALC_DIV_QUOT:       DEFS 4           ; 4 bytes — 32-bit quotient accumulator
                                 ; for the same routine, MSB-first, built
                                 ; up one bit per iteration alongside
                                 ; CALC_DIV_REM above.
@@ -2152,7 +2077,6 @@ CALC_DIV_QUOT:       DEFS 4           ; 4 bytes — 32-bit quotient accumulator
 ; do_sub/do_mul/do_div/negate clear-sites in BASIC_EVAL_EXPR/TERM/
 ; FACTOR for how that's enforced); SIN/SQR_ARG_N and the SIN_* buffers
 ; are pure scratch for those two routines' own internal orchestration.
-FUNC_RESULT_IS_FLOAT:DEFS 1          ; 1 byte — 1 if FUNC_RESULT_FLOAT holds
                                 ; a meaningful value for the expression
                                 ; just evaluated, 0 otherwise. Cleared
                                 ; at the top of every BASIC_STMT_PRINT,
@@ -2160,7 +2084,6 @@ FUNC_RESULT_IS_FLOAT:DEFS 1          ; 1 byte — 1 if FUNC_RESULT_FLOAT holds
                                 ; before every function dispatch;set
                                 ; back to 1 only by SQR/SIN's own
                                 ; dispatch bodies, after the clear.
-FUNC_RESULT_FLOAT_NEGATIVE:DEFS 1         ; 1 byte — 1 if the true value in
                                 ; FUNC_RESULT_FLOAT should print with a
                                 ; leading "-". FUNC_RESULT_FLOAT itself
                                 ; is always a non-negative magnitude
@@ -2171,7 +2094,6 @@ FUNC_RESULT_FLOAT_NEGATIVE:DEFS 1         ; 1 byte — 1 if the true value in
                                 ; than folded into the packed float,
                                 ; which keeps BASIC_FLOAT_TO_STRING
                                 ; itself sign-agnostic.
-FUNC_RESULT_FLOAT:   DEFS 5           ; 5 bytes — packed float (rom/exrom_
                                 ; calc.asm's own format), valid only
                                 ; when FUNC_RESULT_IS_FLOAT=1. A plain
                                 ; copy taken from CALC_STACK's top slot
@@ -2180,29 +2102,24 @@ FUNC_RESULT_FLOAT:   DEFS 5           ; 5 bytes — packed float (rom/exrom_
                                 ; so a PRINT that never materializes
                                 ; (LET x = SQR(2), IF SQR(2)>1 THEN...)
                                 ; can never leak a stack slot.
-FLOAT_PRINT_INTPART: DEFS 2           ; 2 bytes — BASIC_FLOAT_TO_STRING's own
                                 ; scratch: the truncated integer part,
                                 ; stashed across the BASIC_NUM_TO_STRING
                                 ; call (which needs DE, and destroys
                                 ; everything) so it can be re-pushed as
                                 ; a float afterward for the fractional-
                                 ; remainder subtraction
-SQR_ARG_N:           DEFS 2           ; 2 bytes — BASIC_SQR_FLOAT's own
                                 ; scratch: the original int argument,
                                 ; re-pushed as a float on every Newton
                                 ; iteration (n/x_k) rather than kept on
                                 ; CALC_STACK across the loop
-SIN_X_RAD:           DEFS 5           ; 5 bytes — BASIC_SIN_FLOAT's own
                                 ; scratch: the reduced argument in
                                 ; radians (packed float), computed once
                                 ; and re-pushed from here on every
                                 ; power/term step instead of re-running
                                 ; the degrees->radians conversion each
                                 ; time
-SIN_X2:              DEFS 5           ; 5 bytes — x_rad squared, packed float,
                                 ; computed once and reused every
                                 ; iteration of the term-generating loop
-SIN_POWER:           DEFS 5           ; 5 bytes — running |term_k| (always
                                 ; non-negative — see BASIC_SIN_FLOAT's
                                 ; own header for the sign-free
                                 ; recurrence this depends on), packed
@@ -2226,7 +2143,6 @@ SIN_POWER:           DEFS 5           ; 5 bytes — running |term_k| (always
 ; nonzero by both wrapper routines around their own page-in/call/page-
 ; out, checked by BASIC_EVAL_PRIMARY's USR dispatch case, which skips
 ; the actual jump and returns 0 instead whenever this is set.
-BASIC_CHECK_ONLY:    DEFS 1           ; 1 byte — 0 = real execution (USR
                                 ; really jumps), nonzero = a static
                                 ; check pass is in progress (USR is a
                                 ; no-op, returns 0)
@@ -2275,11 +2191,7 @@ BANK_EXROM_DEPTH:    DEFS 1           ; 1 byte — 0 = chunk 6 currently Home
 ; label's position exactly like GOTO does. BASIC_STMT_RETURN pops it
 ; back into GOTO_TARGET. GOSUB_STACK_MAX matches FOR_STACK_MAX's own
 ; "generous but bounded" sizing rather than being separately justified.
-GOSUB_STACK_MAX     EQU 8
-GOSUB_STACK_ENTRY_LEN EQU 2
-GOSUB_STACK:         DEFS 16          ; GOSUB_STACK_MAX*GOSUB_STACK_ENTRY_LEN
                                 ; = 16 bytes, through $B2A0
-GOSUB_STACK_DEPTH:   DEFS 1           ; 1 byte — number of live entries
 
 ; ---- UDG table + block-graphics scratch (2026-08-22) ----
 ; Real TS2068/Spectrum-family hardware (confirmed via the ROM
@@ -2341,8 +2253,6 @@ BLOCK_GFX_SCRATCH:   DEFS 8           ; 8 bytes, through $B351
 ;     OWN buffer since both sides must be held simultaneously to
 ;     compare them — that's STR_CMP_RIGHT, the one buffer that
 ;     couldn't be shared with anything else.
-STR_EXPR_SCRATCH:    DEFS 32          ; 32 bytes, through $B6B1
-STR_CMP_RIGHT:       DEFS 32          ; 32 bytes, through $B6D1
 
 ; ---- Numeric arrays (Phase 3, part 3, 2026-08-22) ----
 ; Option 2 from the design discussion: a DYNAMIC region, not a fixed
@@ -2378,12 +2288,9 @@ STR_CMP_RIGHT:       DEFS 32          ; 32 bytes, through $B6D1
 ; used repeatedly (SPRITE_ARG_*, GFX_FILL_X/Y, etc.).
 ARRAYS_END:          DEFS 2           ; 2 bytes — current top of the dynamic
                                 ; arrays region (== PROG_END when empty)
-ARRAY_DIM_COUNT:     DEFS 2           ; 2 bytes — DIM's own parsed size,
                                 ; between parsing and committing
-ARRAY_INDEX:         DEFS 2           ; 2 bytes — a parsed array subscript,
                                 ; shared by the read and write paths
                                 ; (never live at the same time)
-ARRAY_ASSIGN_VALUE:  DEFS 2           ; 2 bytes — array assignment's own
                                 ; parsed RHS value, between parsing and
                                 ; the store
 
@@ -2420,30 +2327,16 @@ ARRAY_ASSIGN_VALUE:  DEFS 2           ; 2 bytes — array assignment's own
 ; memory/memory.asm) for the real code; MEM_FREE_BYTES and the
 ; program-growth boundary check both compare against VARS_START now,
 ; not the fixed PROG_AREA_MAX, since scalars can occupy that space too.
-ARRAY_KIND_NUM       EQU 0    ; numeric array (existing, Phase 3)
-VAR_KIND_NUM         EQU 1    ; numeric scalar
-VAR_KIND_STR         EQU 2    ; string scalar
-ARRAY_KIND_STR       EQU 3    ; string array, 32 bytes per element
-VAR_NUM_UNITS        EQU 1    ; numeric scalar data = 1*2 = 2 bytes
-VAR_STR_UNITS        EQU 16   ; string scalar data = 16*2 = 32 bytes
 VARS_START:          DEFS 2           ; 2 bytes — scalar pool's own
                                 ; high-water mark, grows DOWN from
                                 ; PROG_AREA_MAX (opposite direction
                                 ; from ARRAYS_END)
-POOL_SCAN_END:       DEFS 2           ; 2 bytes — BASIC_ARRAY_FIND's own
                                 ; scratch: the resolved end boundary
                                 ; for whichever region the current scan
                                 ; is searching (ARRAYS_END or PROG_AREA_
                                 ; MAX), re-read fresh every loop
                                 ; iteration since DE is busy holding
                                 ; each record's own count field
-POOL_RECORD_KIND:    DEFS 1           ; current record kind during scan
-ARRAY_DIM_KIND:      DEFS 1           ; DIM allocator's requested kind
-ARRAY_ALLOC_BYTES:   DEFS 2           ; DIM's computed data-byte count
-STR_ASSIGN_KIND:     DEFS 1           ; 0=scalar, nonzero=string array
-STR_ASSIGN_LETTER:   DEFS 1           ; target survives nested RHS parsing
-STR_ASSIGN_INDEX:    DEFS 2           ; target index survives RHS parsing
-VAR_CHECK_SCRATCH:   DEFS 32          ; 32 bytes — BASIC_VAR_FIND_OR_
                                 ; CREATE's dummy return address during
                                 ; a BASIC_CHECK_ONLY whole-program check
                                 ; pass, so a scalar reference in a
@@ -2491,7 +2384,6 @@ VAR_CHECK_SCRATCH:   DEFS 32          ; 32 bytes — BASIC_VAR_FIND_OR_
 ; for any realistic program, not unbounded (matches this project's own
 ; established "small fixed pool" precedent — FOR_STACK_MAX, GOSUB_
 ; STACK_MAX, SPRITE_SLOT_MAX all made the same tradeoff).
-STR_FUNC_POOL_SLOTS EQU 4
 ; Runtime execution is mutually exclusive with editing, but the static checker
 ; is not: BASIC_DRAW_STATUS_LINE may validate a stored, flagged statement while
 ; EDIT_LINE_BUF contains the user's uncommitted edits. String functions invoked
@@ -2504,16 +2396,11 @@ STR_FUNC_POOL_SLOTS EQU 4
 ; fixed upper-RAM state and module window remain below the genuine stack
 ; headroom at `$F600-$FEFF` (2,304 bytes below SP=$FF00).
 STR_FUNC_POOL        EQU $F328
-    ASSERT 128 == (STR_FUNC_POOL_SLOTS * 32)
     ASSERT STR_FUNC_POOL + 128 == $F3A8
     ASSERT STR_FUNC_POOL + 128 <= $FF00
 ; Minimal numeric DEF FN runtime state. Kept beside the relocated string pool
 ; so the spike consumes no BASIC program RAM. Definitions are established when
 ; their DEF statement executes; recursive FN evaluation is rejected.
-DEF_FN_NAME          EQU $F3A8
-DEF_FN_PARAM         EQU $F3A9
-DEF_FN_EXPR_PTR      EQU $F3AA
-DEF_FN_ARG           EQU $F3AC
 DEF_FN_ACTIVE        EQU $F3AE
     ASSERT DEF_FN_ACTIVE + 1 == $F3AF
     ASSERT DEF_FN_ACTIVE + 1 <= $FF00
@@ -2523,8 +2410,6 @@ DEF_FN_ACTIVE        EQU $F3AE
 ; The module payload itself is loaded at EXTENSION_MODULE_BASE and must remain
 ; below EXTENSION_MODULE_LIMIT, leaving more than 2K of stack headroom.
 EXTENSION_MAGIC       EQU $F3AF       ; 2 bytes; zero means no extension
-EXTENSION_NAME_PTR    EQU $F3B1       ; 2 bytes; null-terminated RAM keyword
-EXTENSION_EXEC_PTR    EQU $F3B3       ; 2 bytes; callback after two args parsed
 INSTR_POS             EQU $F3B5       ; current 1-based candidate position
 EXT_SERVICE_VERSION_ADDR EQU $F3B6
 EXT_SERVICE_REGISTER     EQU $F3B7    ; three-byte callable JP veneer
@@ -2532,13 +2417,11 @@ EXT_SERVICE_PRINT_ATTR   EQU $F3BA
 EXT_SERVICE_WRITE_PIXEL  EQU $F3BD
 EXT_SERVICE_READ_OVER    EQU $F3C0
 EXT_SERVICE_TABLE_END    EQU $F3C3
-EXTENSION_GRAMMAR        EQU $F3C3       ; 0=expr,expr; 1=LINE-shaped
 EXTENSION_ARG0           EQU $F3C4
 EXTENSION_ARG1           EQU $F3C5
 EXTENSION_ARG2           EQU $F3C6
 EXTENSION_ARG3           EQU $F3C7
 EXT_SERVICE_ABI_VERSION  EQU 1
-EXTENSION_REG_MAGIC   EQU $5845       ; "EX" little-endian
 EXTENSION_MODULE_BASE EQU $F400
 EXTENSION_MODULE_LIMIT EQU $F600
     ASSERT INSTR_POS + 1 == $F3B6
@@ -2557,11 +2440,9 @@ STR_FUNC_POOL_NEXT:  DEFS 1           ; 1 byte — next free slot (0-4); reset
                                 ; within a single statement's own
                                 ; evaluation should always leave it at
                                 ; 0 again on its own
-STR_FUNC_CALL_ID:    DEFS 1           ; 1 byte — which STRING_FUNCTION_TABLE
                                 ; entry matched; numeric functions now store
                                 ; a handler pointer instead
                                 ; own shape for the numeric side
-STR_FUNC_DEST:       DEFS 2           ; 2 bytes — the CALLER's own target
                                 ; buffer (BASIC_EVAL_STR_PRIMARY's own
                                 ; DE-in contract), stashed here across
                                 ; argument parsing, which needs DE for
@@ -2611,22 +2492,12 @@ STR_FUNC_DEST:       DEFS 2           ; 2 bytes — the CALLER's own target
 ; instead of also routing through EXROM like VAL does. (INSTR/
 ; STRFUNC_ID_INSTR/ARGC_STR2 and FILL$/STRFUNC_ID_FILL were both here
 ; too originally — dropped 2026-08-22 to fit Home ROM's own budget.)
-STRFUNC_ID_CHR      EQU 1
-STRFUNC_ID_STR      EQU 2
-STRFUNC_ID_UPPER    EQU 3
-STRFUNC_ID_LOWER    EQU 4
-STRFUNC_ID_LEFT     EQU 5
-STRFUNC_ID_RIGHT    EQU 6
-STRFUNC_ID_INKEY    EQU 8   ; numbering keeps the original gaps where
                             ; STRFUNC_ID_FILL (7) and STRFUNC_ID_INSTR
                             ; (10) used to be, rather than renumbering
                             ; everything after a drop — these are
                             ; internal dispatch IDs, not anything a
                             ; BASIC program can observe
-STRFUNC_ID_VAL      EQU 9
-ARGC_STR1           EQU 100  ; sentinel FUNC_CALL_ARGC value: 1 string
                              ; argument (LEN, CODE, VAL)
-ARGC_STR2           EQU 102  ; two string arguments (INSTR)
 
 ; ---- keyword-highlighting bold spans (2026-08-23) ---- BASIC_DETECT_
 ; KEYWORD_PREFIX used to record just ONE (start=0, length) bold run —
@@ -2640,17 +2511,12 @@ ARGC_STR2           EQU 102  ; two string arguments (INSTR)
 ; of whatever BASIC_TRY_DETECT_ONE/_ENDIF most recently matched,
 ; still used standalone by BASIC_UPPERCASE_KEYWORD_PREFIX at commit
 ; time, which only ever normalizes the FIRST word — unchanged).
-HILITE_KW_MAX_SPANS EQU 4        ; more colon-separated keyword
                                  ; segments than this on one 128-byte
                                  ; line is not realistically reachable
-HILITE_KW_COUNT:     DEFS 1           ; 1 byte — how many spans below are
                                 ; valid (0-HILITE_KW_MAX_SPANS)
-HILITE_KW_START:     DEFS 4           ; HILITE_KW_MAX_SPANS bytes — each
                                 ; span's start offset from
                                 ; HILITE_LINE_BASE
-HILITE_KW_SPANLEN:   DEFS 4           ; HILITE_KW_MAX_SPANS bytes — each
                                 ; span's length
-HILITE_TABLE_PTR:    DEFS 2           ; 2 bytes — KEYWORD_HILITE_TABLE's own
                                 ; real address (basic/basic.asm),
                                 ; stashed here by the Home-side
                                 ; BASIC_DETECT_KEYWORD_PREFIX wrapper
