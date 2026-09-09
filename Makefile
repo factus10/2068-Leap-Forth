@@ -1,6 +1,6 @@
-.PHONY: all boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63 product docs dist check clean
+.PHONY: all boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63 forth-boot-cart forth-demo-blackjack-cart cart product docs dist check clean
 
-all: boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63
+all: boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63 forth-boot-cart forth-demo-blackjack-cart
 
 # Milestone 0: boot stub only.
 boot:
@@ -535,6 +535,27 @@ forth-smoke-p63:
 # The two ROMs people actually run: the live Forth and the Blackjack demo.
 product: forth-boot forth-demo-blackjack
 
+# DOCK-cartridge (LROS) builds of the same two ROMs: assembled with
+# -DCARTRIDGE, which swaps the reset stub at $0000 for the 5-byte LROS
+# header and adds a CART_START entry stub (see the IFDEF CARTRIDGE
+# blocks in rom/forth_boot.asm). Every other byte is identical to the
+# home-ROM build. tools/make_dck.py then wraps the raw image as a .dck
+# for Fuse (--dock) and ZEsarUX; the raw *_cart.bin is what goes on an
+# EPROM in a real cartridge.
+forth-boot-cart:
+	mkdir -p build
+	tools/sjasmplus_strict.sh -DCARTRIDGE --sym=build/forth_boot_cart.sym --lst=build/forth_boot_cart.lst rom/forth_boot.asm
+	mv forth_boot_cart.bin build/forth_boot_cart.bin
+	python3 tools/make_dck.py build/forth_boot_cart.bin build/forth_boot.dck
+
+forth-demo-blackjack-cart:
+	mkdir -p build
+	tools/sjasmplus_strict.sh -DCARTRIDGE --sym=build/forth_demo_blackjack_cart.sym --lst=build/forth_demo_blackjack_cart.lst rom/forth_demo_blackjack.asm
+	mv forth_demo_blackjack_cart.bin build/forth_demo_blackjack_cart.bin
+	python3 tools/make_dck.py build/forth_demo_blackjack_cart.bin build/forth_demo_blackjack.dck
+
+cart: forth-boot-cart forth-demo-blackjack-cart
+
 # PDF/DOCX renders of the user-facing docs -> build/docs/. Needs pandoc
 # plus the weasyprint and python-docx Python packages; see
 # tools/build_docs.sh's own header.
@@ -542,10 +563,10 @@ docs:
 	tools/build_docs.sh
 
 # The downloadable bundle -> dist/2068-Forth-<version>.zip: both product
-# ROMs, an EXROM placeholder, symbol listings, and the docs as Markdown,
-# PDF, and DOCX. This is what the GitHub Actions workflow
+# ROMs as home-ROM images and as DOCK cartridges (.dck), an EXROM
+# placeholder, symbol listings, and the docs as Markdown, PDF, and DOCX. This is what the GitHub Actions workflow
 # (.github/workflows/build.yml) attaches to every build and release.
-dist: product docs
+dist: product cart docs
 	tools/package_dist.sh
 
 check:

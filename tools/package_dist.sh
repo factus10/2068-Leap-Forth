@@ -5,6 +5,8 @@
 #   roms/      forth_boot_rom0.bin (the product), forth_demo_blackjack_rom0.bin
 #              (the demo), stock_shaped_exrom.bin (an inert EXROM placeholder
 #              for emulators -- see tools/make_exrom_placeholder.sh)
+#   cartridge/ the same two ROMs as DOCK cartridges: *.dck for emulators,
+#              *_cart.bin raw LROS images for a real cartridge EPROM
 #   symbols/   .sym/.lst listings for both ROMs, for anyone debugging
 #   docs/      the tutorial (Markdown, PDF, DOCX) with its images, the
 #              README (Markdown, PDF), hardware notes, numeric model
@@ -32,7 +34,7 @@ date=$(git log -1 --format=%cI)
 name="2068-Forth-$VERSION"
 stage="dist/$name"
 rm -rf "$stage" "dist/$name.zip" "dist/$name.zip.sha256"
-mkdir -p "$stage/roms" "$stage/symbols" "$stage/docs/images"
+mkdir -p "$stage/roms" "$stage/cartridge" "$stage/symbols" "$stage/docs/images"
 
 # --- ROMs ---------------------------------------------------------------
 for rom in forth_boot forth_demo_blackjack; do
@@ -42,6 +44,12 @@ for rom in forth_boot forth_demo_blackjack; do
 done
 tools/make_exrom_placeholder.sh
 cp build/stock_shaped_exrom.bin "$stage/roms/"
+
+# --- DOCK cartridge builds ------------------------------------------------
+for rom in forth_boot forth_demo_blackjack; do
+  test -f "build/$rom.dck" || { echo "missing build/$rom.dck -- run make cart first" >&2; exit 1; }
+  cp "build/$rom.dck" "build/${rom}_cart.bin" "$stage/cartridge/"
+done
 
 # --- docs ---------------------------------------------------------------
 cp README.md docs/forth_tutorial.md docs/hardware_notes.md docs/numeric_model.md "$stage/docs/"
@@ -89,6 +97,11 @@ roms/forth_demo_blackjack_rom0.bin A ROM that boots straight into the
 roms/stock_shaped_exrom.bin        An inert 8K EXROM placeholder, for
                                    emulators that insist on a second ROM
                                    file. Use a real EXROM dump if you have one.
+cartridge/forth_boot.dck           The same two ROMs built as DOCK cartridges
+cartridge/forth_demo_blackjack.dck (LROS format, chunks 0-1). Plug in instead
+                                   of replacing the home ROM -- see below.
+cartridge/*_cart.bin               The raw 16K LROS images inside those .dck
+                                   files, for burning to a cartridge EPROM.
 symbols/                           Assembler .sym/.lst listings for both ROMs.
 docs/forth_tutorial.{md,pdf,docx}  Learning Forth on 2068-Forth -- start here.
 docs/README.{md,pdf}               The project README (status, word list).
@@ -105,10 +118,20 @@ which is the same as:
 It boots to a banner, plays a short startup sound, and drops you at a
 keyboard-driven prompt. Try:   5 BORDER      5 3 + .      : GREET ." HI" ; GREET
 
-Each ROM is a raw 16384-byte image for the TS2068's home-bank ROM slot
-(the "rom0" / DOCK-less boot ROM), so it can also be burned to an EPROM
-or loaded by any TS2068 emulator or ROM-replacement hardware that
-accepts a raw 16K home ROM.
+Each roms/*.bin is a raw 16384-byte image for the TS2068's home-bank ROM
+slot (the "rom0" boot ROM), so it can also be burned to an EPROM or
+loaded by any TS2068 emulator or ROM-replacement hardware that accepts a
+raw 16K home ROM.
+
+Running it as a cartridge
+-------------------------
+The cartridge/ builds leave the stock ROMs in place: the machine boots
+normally, finds the cartridge in the DOCK slot, and hands control to
+2068-Forth. In Fuse:
+    fuse --machine ts2068 --dock cartridge/forth_boot.dck
+In ZEsarUX: select the TS2068, smartload the .dck, then hard reset.
+For real hardware, burn cartridge/forth_boot_cart.bin to a 16K (27128)
+EPROM on a DOCK cartridge board mapped to chunks 0-1 (addresses 0000h-3FFFh).
 
 Build details are in BUILD_INFO.txt. Licence: MIT (see LICENSE).
 TXT

@@ -82,9 +82,27 @@
     ORG $0000
 
 ; ---- RST 00: cold start ----
+    IFDEF CARTRIDGE
+; ---- DOCK cartridge build (make forth-boot-cart): the 5-byte LROS header
+; the stock ROM's initialization looks for at DOCK $0000 (TS2068
+; Technical Manual §5.1.1). The OS copies it into SYSCON, enables the
+; chunks named here, and jumps to the start address -- so the reset
+; stub below is never executed in this build and its bytes become the
+; header. Nothing else in the image changes; RST/NMI vectors and
+; COLD_START are at the same addresses in both builds. ----
+    DB   $00                        ; not used
+    DB   $01                        ; cartridge type 1 = LROS
+    DW   CART_START                 ; start address, JP byte order
+    DB   %11111100                  ; chunk spec, LOW-active: chunks 0-1
+                                    ; in use ($0000-$3FFF), 2-7 stay
+                                    ; Home. Bit 3 must be 1 so the OS's
+                                    ; GOTO_BANK (in Home chunk 3) can
+                                    ; finish the handoff.
+    ELSE
 RST_00:
     di
     jp   COLD_START
+    ENDIF
 
     DS   $0008 - $, $FF
 RST_08:
@@ -122,6 +140,22 @@ RST_38:
     DS   $0066 - $, $FF
 NMI_ENTRY:
     retn
+
+    IFDEF CARTRIDGE
+; ---- LROS entry point (DOCK cartridge build only). The stock ROM
+; hands over with IM 1 set and interrupts ENABLED, so RST_38 above
+; could fire before KBD_ISR_INIT has run; a cold home-ROM boot never
+; has this problem because the Z80 resets with interrupts off. Also
+; establish a known DECR (port $FF) shadow: bit 7 = 0 keeps the DOCK
+; bank selected -- the one thing that must never change while this
+; ROM is executing from it. Then fall into the ordinary cold start. ----
+CART_START:
+    di
+    xor  a
+    ld   (PORT_FF_SHADOW), a
+    out  (PORT_SCLD), a
+    jp   COLD_START
+    ENDIF
 
     DS   $0100 - $, $FF
 
@@ -557,4 +591,8 @@ DICT_CHAIN_POINT DEFL H_UDG
 
     DS   $4000 - $, $FF
 
+    IFDEF CARTRIDGE
+    SAVEBIN "forth_boot_cart.bin", $0000, $4000   ; raw LROS image; tools/make_dck.py wraps it as .dck
+    ELSE
     SAVEBIN "forth_boot_rom0.bin", $0000, $4000
+    ENDIF

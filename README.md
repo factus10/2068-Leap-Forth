@@ -21,9 +21,9 @@ the ROMs and packages them with the docs:
 - **Numbered releases**: the [releases page](https://github.com/nchiker/2068-Leap-Forth/releases).
 
 Each zip holds `forth_boot_rom0.bin` (the live Forth), the Blackjack
-demo ROM, an EXROM placeholder for emulators, symbol listings, and the
-tutorial and README as Markdown, PDF, and DOCX, plus a `run_fuse.sh` to
-boot it in Fuse. See `README-FIRST.txt` inside. The build itself is
+demo ROM, both of them again as DOCK cartridges (`.dck`), an EXROM
+placeholder for emulators, symbol listings, and the tutorial and README
+as Markdown, PDF, and DOCX, plus a `run_fuse.sh` to boot it in Fuse. See `README-FIRST.txt` inside. The build itself is
 [`.github/workflows/build.yml`](.github/workflows/build.yml); `make dist`
 produces the same zip locally.
 
@@ -1026,6 +1026,7 @@ make forth-smoke-p48  # Phase 48 smoke ROM: ULAPLUS/PALETTE (visual)
 make forth-boot       # the real, live, bootable product ROM
 make check            # static asm checks over core/, kernel/, and rom/
 make product          # just the two ROMs people run: forth-boot + forth-demo-blackjack
+make cart             # the same two as DOCK cartridges -> build/*.dck (+ raw *_cart.bin)
 make docs             # tutorial + README as PDF (and the tutorial as DOCX) -> build/docs/
 make dist             # everything above zipped for download -> dist/2068-Forth-<version>.zip
 ```
@@ -1051,8 +1052,24 @@ fuse --machine ts2068 --rom-ts2068-0 build/forth_boot_rom0.bin \
      --rom-ts2068-1 build/stock_shaped_exrom.bin
 ```
 
-It boots to a banner, plays a short startup sound, and drops you at a
-real keyboard-driven prompt. Try `5 BORDER` and press Enter, `5 3 + .`
+Or leave the stock ROMs alone and plug it in as a cartridge instead:
+`make forth-boot-cart` assembles the same ROM with `-DCARTRIDGE`, which
+puts the 5-byte LROS header at `$0000` in place of the reset stub (the
+Technical Manual's §5.1.1 contract — the OS finds it, enables DOCK
+chunks 0-1, and jumps in) and wraps the image as `build/forth_boot.dck`:
+
+```sh
+fuse --machine ts2068 --dock build/forth_boot.dck
+```
+
+The raw `build/forth_boot_cart.bin` is what goes on the EPROM of a real
+DOCK cartridge. Nothing in the Forth changes between the two builds;
+see the `IFDEF CARTRIDGE` blocks in `rom/forth_boot.asm` for the whole
+difference (header, plus a `DI`-first entry stub because the OS hands
+over with interrupts already enabled).
+
+Either way it boots to a banner, plays a short startup sound, and drops
+you at a real keyboard-driven prompt. Try `5 BORDER` and press Enter, `5 3 + .`
 to see `.` print `8` on the row below the banner, `5 3 > .` to see `-1`
 (Forth's TRUE) printed, `VARIABLE FOO 42 FOO ! FOO @ .` to see `42`,
 `: GREET ." HI" ; GREET` to see `."` print a literal string, `: FIVE 5 0 DO I . LOOP ; FIVE` to see
