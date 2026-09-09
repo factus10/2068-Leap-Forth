@@ -6,6 +6,7 @@
 /rom/*.lst
 /rom/*.sym
 /build/
+/dist/
 
 # Local tool state
 __pycache__/

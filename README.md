@@ -9,6 +9,24 @@ is free to diverge from its conventions from here on. See
 [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for exactly what was
 inherited, what was deliberately left behind, and the phased build order.
 
+## Downloads
+
+[![Build ROMs](https://github.com/nchiker/2068-Leap-Forth/actions/workflows/build.yml/badge.svg)](https://github.com/nchiker/2068-Leap-Forth/actions/workflows/build.yml)
+
+You don't need the assembler to try it. Every push to `master` rebuilds
+the ROMs and packages them with the docs:
+
+- **Latest build** (rebuilt on every push):
+  [2068-Forth-latest.zip](https://github.com/nchiker/2068-Leap-Forth/releases/download/latest/2068-Forth-latest.zip)
+- **Numbered releases**: the [releases page](https://github.com/nchiker/2068-Leap-Forth/releases).
+
+Each zip holds `forth_boot_rom0.bin` (the live Forth), the Blackjack
+demo ROM, an EXROM placeholder for emulators, symbol listings, and the
+tutorial and README as Markdown, PDF, and DOCX, plus a `run_fuse.sh` to
+boot it in Fuse. See `README-FIRST.txt` inside. The build itself is
+[`.github/workflows/build.yml`](.github/workflows/build.yml); `make dist`
+produces the same zip locally.
+
 ## Status
 
 - Milestone 0 (`rom/main.asm`, inherited verbatim from 2068-Leap's own
@@ -1007,7 +1025,17 @@ make forth-smoke-p47  # Phase 47 smoke ROM: LPRINT/LLIST
 make forth-smoke-p48  # Phase 48 smoke ROM: ULAPLUS/PALETTE (visual)
 make forth-boot       # the real, live, bootable product ROM
 make check            # static asm checks over core/, kernel/, and rom/
+make product          # just the two ROMs people run: forth-boot + forth-demo-blackjack
+make docs             # tutorial + README as PDF (and the tutorial as DOCX) -> build/docs/
+make dist             # everything above zipped for download -> dist/2068-Forth-<version>.zip
 ```
+
+`make docs`/`make dist` additionally need pandoc and the Python packages
+in `tools/requirements-docs.txt` (`pip install -r tools/requirements-docs.txt`)
+— see `tools/build_docs.sh`'s header for the system libraries WeasyPrint
+wants. The GitHub Actions workflow runs `make dist` on
+every push (see [Downloads](#downloads)); to cut a numbered release,
+push a tag: `git tag v1.0 && git push origin v1.0`.
 
 ## Try it
 

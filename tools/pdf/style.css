@@ -1,0 +1,90 @@
+/* Print stylesheet used by tools/build_docs.sh (pandoc -> HTML -> WeasyPrint).
+   Deliberately plain: the goal is a readable, searchable PDF of the
+   Markdown docs, not a designed document. */
+
+@page {
+  size: Letter;
+  margin: 2cm 2cm 2.2cm 2cm;
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 9pt;
+    color: #666;
+  }
+}
+
+html { font-size: 10.5pt; }
+
+body {
+  font-family: "DejaVu Serif", Georgia, "Times New Roman", serif;
+  line-height: 1.45;
+  color: #111;
+  max-width: none;
+  margin: 0;
+}
+
+h1, h2, h3, h4 {
+  font-family: "DejaVu Sans", Helvetica, Arial, sans-serif;
+  line-height: 1.2;
+  page-break-after: avoid;
+  break-after: avoid;
+}
+h1 { font-size: 2em; margin-top: 0; }
+h2 { font-size: 1.5em; margin-top: 1.6em; border-bottom: 1px solid #bbb; padding-bottom: 0.15em; }
+h3 { font-size: 1.2em; margin-top: 1.3em; }
+h1.title { margin-bottom: 0.2em; }
+p.subtitle, p.author, p.date { margin: 0; color: #555; font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; }
+
+p, li { orphans: 3; widows: 3; }
+
+code, pre, kbd, samp {
+  font-family: "DejaVu Sans Mono", Menlo, Consolas, "Courier New", monospace;
+  font-size: 0.9em;
+}
+code {
+  background: #f1f1f1;
+  padding: 0 0.2em;
+  border-radius: 2px;
+}
+pre {
+  background: #f4f4f4;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 0.6em 0.8em;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+pre code { background: none; padding: 0; }
+
+table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 0.92em;
+  page-break-inside: auto;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 0.25em 0.5em;
+  vertical-align: top;
+  text-align: left;
+}
+th { background: #eee; font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; }
+tr { page-break-inside: avoid; break-inside: avoid; }
+
+img { max-width: 100%; height: auto; display: block; margin: 0.8em auto; }
+figure { margin: 0.8em 0; page-break-inside: avoid; break-inside: avoid; }
+figcaption { font-size: 0.85em; color: #555; text-align: center; }
+
+blockquote {
+  margin: 0.8em 0;
+  padding-left: 0.8em;
+  border-left: 3px solid #ccc;
+  color: #444;
+}
+
+hr { border: 0; border-top: 1px solid #bbb; margin: 1.5em 0; }
+
+a { color: #0645ad; text-decoration: none; }

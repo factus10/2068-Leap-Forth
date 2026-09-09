@@ -1,4 +1,4 @@
-.PHONY: all boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63 check clean
+.PHONY: all boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63 product docs dist check clean
 
 all: boot forth-smoke forth-smoke-p3 forth-smoke-p4 forth-smoke-p5 forth-smoke-p6 forth-smoke-p7 forth-smoke-p8 forth-smoke-p8b forth-smoke-p9 forth-smoke-p10 forth-smoke-p11 forth-smoke-p12 forth-smoke-p13 forth-smoke-p14 forth-smoke-p15 forth-smoke-p16 forth-smoke-p17 forth-smoke-p18 forth-smoke-p19 forth-smoke-p20 forth-smoke-p21 forth-smoke-p22 forth-smoke-p23 forth-smoke-p24 forth-smoke-p25 forth-smoke-p26 forth-smoke-p27 forth-smoke-p28 forth-smoke-p29 forth-smoke-p30 forth-smoke-p31 forth-smoke-p32 forth-smoke-p33 forth-smoke-p34 forth-smoke-p35 forth-smoke-p36 forth-smoke-p37 forth-smoke-p38 forth-smoke-p40 forth-smoke-p41 forth-smoke-p42 forth-smoke-p43 forth-smoke-p44 forth-smoke-p45 forth-smoke-p46 forth-smoke-p47 forth-smoke-p48 forth-smoke-p49 forth-smoke-p50 forth-smoke-p51 forth-boot forth-demo-blackjack forth-smoke-p52 forth-smoke-p53-realtape forth-smoke-p54 forth-smoke-p55 forth-smoke-p56 forth-smoke-p57 forth-smoke-p58 forth-smoke-p59 forth-smoke-p60 forth-smoke-p61 forth-smoke-p62 forth-smoke-p63
 
@@ -532,9 +532,25 @@ forth-smoke-p63:
 	tools/sjasmplus_strict.sh --sym=build/forth_smoke_p63.sym --lst=build/forth_smoke_p63.lst rom/forth_smoke_p63.asm
 	mv forth_smoke_p63_rom0.bin build/forth_smoke_p63_rom0.bin
 
+# The two ROMs people actually run: the live Forth and the Blackjack demo.
+product: forth-boot forth-demo-blackjack
+
+# PDF/DOCX renders of the user-facing docs -> build/docs/. Needs pandoc
+# plus the weasyprint and python-docx Python packages; see
+# tools/build_docs.sh's own header.
+docs:
+	tools/build_docs.sh
+
+# The downloadable bundle -> dist/2068-Forth-<version>.zip: both product
+# ROMs, an EXROM placeholder, symbol listings, and the docs as Markdown,
+# PDF, and DOCX. This is what the GitHub Actions workflow
+# (.github/workflows/build.yml) attaches to every build and release.
+dist: product docs
+	tools/package_dist.sh
+
 check:
 	python3 tools/check_asm.py core/*.asm kernel/*/*.asm rom/*.asm
 	python3 tools/check_z80_opcodes.py core/*.asm kernel/*/*.asm rom/*.asm
 
 clean:
-	rm -rf build
+	rm -rf build dist

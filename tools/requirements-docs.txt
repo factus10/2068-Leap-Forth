@@ -1,0 +1,4 @@
+# Python packages needed by tools/build_docs.sh (make docs / make dist).
+#   pip install -r tools/requirements-docs.txt
+weasyprint>=62
+python-docx>=1.1

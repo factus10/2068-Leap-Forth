@@ -1,0 +1,170 @@
+# Build the ROMs and the downloadable bundle on every push.
+#
+# What it does, in order:
+#   1. Builds SjASMPlus 1.23.1 from source (cached, so it's ~2s after
+#      the first run) -- there's no Linux binary on the sjasmplus
+#      release page, and the Ubuntu package is too old.
+#   2. `make check` and `make all`: every smoke ROM has to assemble
+#      cleanly before anything ships. (These don't *run* the smoke ROMs
+#      -- that still needs Fuse and eyes -- they're a build gate.)
+#   3. `make dist`: the two product ROMs + docs as Markdown/PDF/DOCX,
+#      zipped into dist/2068-Forth-<version>.zip.
+#   4. Publishes it:
+#        - every run:            as a workflow artifact (Actions tab).
+#        - every push to master: as the rolling "latest" pre-release, so
+#                                there's a permanent download link:
+#           https://github.com/nchiker/2068-Leap-Forth/releases/download/latest/2068-Forth-latest.zip
+#        - every tag vX.Y[.Z]:   as a proper versioned release with
+#                                auto-generated notes. To cut one:
+#                                  git tag v1.0 && git push origin v1.0
+#
+# It can also be run by hand from the Actions tab ("Run workflow").
+name: Build ROMs
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# One build per ref at a time; a newer push cancels the older run so two
+# runs never race to update the "latest" release.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SJASMPLUS_VERSION: 1.23.1
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # needed only by the two release steps below
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so `git describe`/tag lookups work
+
+      # ---- SjASMPlus --------------------------------------------------
+      - name: Cache SjASMPlus
+        id: sjasmplus-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/sjasmplus
+          key: sjasmplus-${{ env.SJASMPLUS_VERSION }}-${{ runner.os }}-ubuntu-24.04
+
+      - name: Build SjASMPlus ${{ env.SJASMPLUS_VERSION }} from source
+        if: steps.sjasmplus-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/sjasmplus.tar.xz \
+            "https://github.com/z00m128/sjasmplus/releases/download/v${SJASMPLUS_VERSION}/sjasmplus-${SJASMPLUS_VERSION}-src.tar.xz"
+          tar -C /tmp -xf /tmp/sjasmplus.tar.xz
+          make -C "/tmp/sjasmplus-${SJASMPLUS_VERSION}" -j"$(nproc)"
+          mkdir -p ~/.local/bin
+          install -m 755 "/tmp/sjasmplus-${SJASMPLUS_VERSION}/sjasmplus" ~/.local/bin/sjasmplus
+
+      - name: Add SjASMPlus to PATH
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/sjasmplus" --version | head -1
+
+      # ---- doc tooling --------------------------------------------------
+      - name: Install pandoc and WeasyPrint's system libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            pandoc fonts-dejavu-core libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements-docs.txt
+
+      - name: Install WeasyPrint and python-docx
+        run: pip install --quiet -r tools/requirements-docs.txt
+
+      # ---- build ------------------------------------------------------
+      - name: Static checks (make check)
+        run: make check
+
+      - name: Assemble every ROM (make all)
+        run: make all
+
+      - name: Work out the version string
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=dev-$(git log -1 --format=%cd --date=format:%Y%m%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the downloadable bundle (make dist)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          make dist
+          ls -la dist
+          unzip -l dist/2068-Forth-*.zip
+
+      - name: Upload bundle as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 2068-Forth-${{ steps.version.outputs.version }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      # ---- publish: rolling "latest" pre-release on every master push --
+      - name: Update the rolling "latest" pre-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cp dist/2068-Forth-"$VERSION".zip dist/2068-Forth-latest.zip
+          ( cd dist && sha256sum 2068-Forth-latest.zip > 2068-Forth-latest.zip.sha256 )
+
+          # Move the "latest" tag to this commit.
+          git tag -f latest
+          git push -f origin latest
+
+          title="Latest build ($VERSION)"
+          notes=$(printf '%s\n\n%s' \
+            "Automatic build of \`master\` at ${GITHUB_SHA} — a moving target, rebuilt on every push." \
+            "Download **2068-Forth-latest.zip** below: both ROM images, an EXROM placeholder, and the docs as Markdown/PDF/DOCX. See README-FIRST.txt inside. For a fixed, numbered release see the [releases page](https://github.com/${GITHUB_REPOSITORY}/releases).")
+
+          if gh release view latest >/dev/null 2>&1; then
+            # Replace the old assets rather than piling up one per push.
+            for asset in $(gh release view latest --json assets --jq '.assets[].name'); do
+              gh release delete-asset latest "$asset" --yes
+            done
+            gh release edit latest --prerelease --latest=false --title "$title" --notes "$notes"
+          else
+            gh release create latest --prerelease --latest=false --title "$title" --notes "$notes"
+          fi
+          gh release upload latest dist/2068-Forth-latest.zip dist/2068-Forth-latest.zip.sha256
+
+      # ---- publish: numbered release on every v* tag ---------------------
+      - name: Publish the versioned release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes="2068-Forth $VERSION — download **2068-Forth-$VERSION.zip** below: both ROM images, an EXROM placeholder, and the docs as Markdown/PDF/DOCX. See README-FIRST.txt inside."
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" dist/2068-Forth-"$VERSION".zip dist/2068-Forth-"$VERSION".zip.sha256 --clobber
+          else
+            gh release create "$VERSION" --title "2068-Forth $VERSION" --notes "$notes" --generate-notes \
+              dist/2068-Forth-"$VERSION".zip dist/2068-Forth-"$VERSION".zip.sha256
+          fi
